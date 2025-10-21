@@ -6,18 +6,25 @@
 
 ## Overview
 
-Tetrics Reactor is a composable DeFi strategy execution protocol built for cross-chain operations. The protocol enables users to compose complex multi-step DeFi strategies across **Ethereum** and **Hyperliquid** through a unified execution interface with Permit2 integration for gasless approvals.
+Tetrics Reactor is a composable DeFi strategy execution protocol built for
+cross-chain operations. The protocol enables users to compose complex multi-step
+DeFi strategies across **Ethereum** and **Hyperliquid** through a unified
+execution interface with Permit2 integration for gasless approvals.
 
 ### Key Features
 
-- ✅ **Universal Executor**: Single contract for executing multi-protocol strategies
+- ✅ **Universal Executor**: Single contract for executing multi-protocol
+  strategies
 - ✅ **Permit2 Integration**: Gasless token approvals using Uniswap's Permit2
 - ✅ **Cross-Chain Support**: Execute strategies across Ethereum and Hyperliquid
-- ✅ **Modular Adapters**: Protocol-specific adapters for clean separation of concerns
+- ✅ **Modular Adapters**: Protocol-specific adapters for clean separation of
+  concerns
 - ✅ **Price Validation**: RedStone oracle integration for slippage protection
-- ✅ **Multi-Sig Governance**: Time-locked multi-signature wallet for protocol upgrades
+- ✅ **Multi-Sig Governance**: Time-locked multi-signature wallet for protocol
+  upgrades
 - ✅ **Emergency Controls**: Pausability and emergency recovery mechanisms
-- ✅ **ERC-165 & ERC-1271**: Interface detection and contract signature validation
+- ✅ **ERC-165 & ERC-1271**: Interface detection and contract signature
+  validation
 
 ## Architecture
 
@@ -38,7 +45,9 @@ Tetrics Reactor is a composable DeFi strategy execution protocol built for cross
 ### Core Contracts
 
 #### UniExecutor (`src/UniExecutor.sol`)
+
 The universal executor contract that:
+
 - Manages protocol adapter registry
 - Executes single actions and batch operations
 - Integrates with Permit2 for gasless approvals
@@ -47,22 +56,26 @@ The universal executor contract that:
 - Supports multicall operations
 
 **Key Functions:**
+
 - `executeAction(Action)` - Execute single protocol action
 - `executeBatch(Action[])` - Execute multiple actions atomically
 - `executeWithPermit2(Action, Permit2Transfer)` - Execute with gasless approval
 - `executeBatchWithPermit2(...)` - Batch execution with Permit2
-- `executeConditional(ConditionalAction)` - Conditional execution based on balance checks
+- `executeConditional(ConditionalAction)` - Conditional execution based on
+  balance checks
 - `multicallWithValue(bytes[], uint256[])` - Multi-call with value splitting
 
 #### Security Modules
 
 **PriceValidator** (`src/security/PriceValidator.sol`)
+
 - RedStone oracle integration for price validation
 - Slippage protection (default max 10%)
 - Price staleness checks (max 5 minutes)
 - Batch price validation support
 
 **MultiSigManager** (`src/security/MultiSigManager.sol`)
+
 - Multi-signature wallet for governance
 - 24-hour timelock for critical operations
 - Emergency execution mode
@@ -73,45 +86,58 @@ The universal executor contract that:
 #### Ethereum Adapters
 
 **LidoAdapter** (`src/adapters/ethereum/LidoAdapter.sol`)
+
 - Stake ETH → receive stETH
 - Methods: `deposit(amount)`
 
 **WstETHAdapter** (`src/adapters/ethereum/WstETHAdapter.sol`)
+
 - Wrap stETH → wstETH
 - Unwrap wstETH → stETH
 - Methods: `wrap(amount)`, `unwrap(amount)`
 
 **MorphoAdapter** (`src/adapters/ethereum/MorphoAdapter.sol`)
+
 - Supply collateral to Morpho Blue
 - Borrow against collateral
 - Repay loans and withdraw collateral
-- Methods: `supply(amount)`, `borrow(amount)`, `repay(amount)`, `withdraw(amount)`
+- Methods: `supply(amount)`, `borrow(amount)`, `repay(amount)`,
+  `withdraw(amount)`
 
 **AcrossAdapter** (`src/adapters/cross-chain/AcrossAdapter.sol`)
+
 - Bridge assets from Ethereum to Hyperliquid
 - Methods: `deposit(token, amount, destinationChainId, recipient)`
 
 #### Hyperliquid Adapters
 
 **StakedHypeAdapter** (`src/adapters/hyperliquid/StakedHypeAdapter.sol`)
+
 - Stake HYPE → receive beHYPE
 - Unstake beHYPE → receive HYPE
 - Methods: `stake(amount)`, `unstake(amount)`
 
 **HyperLendAdapter** (`src/adapters/hyperliquid/HyperLendAdapter.sol`)
+
 - Aave V3-style lending protocol on Hyperliquid
 - Supply, borrow, repay, and withdraw operations
-- Methods: `supply(asset, amount)`, `borrow(asset, amount)`, `repay(asset, amount)`, `withdraw(asset, amount)`
+- Methods: `supply(asset, amount)`, `borrow(asset, amount)`,
+  `repay(asset, amount)`, `withdraw(asset, amount)`
 
 **FelixAdapter** (`src/adapters/hyperliquid/FelixAdapter.sol`)
+
 - Collateralized Debt Position (CDP) protocol
 - Open CDPs, manage collateral, borrow fUSDC
-- Methods: `openCdp(collateral, amount)`, `deposit(cdpId, amount)`, `withdraw(cdpId, amount)`, `borrow(cdpId, amount)`, `repay(cdpId, amount)`
+- Methods: `openCdp(collateral, amount)`, `deposit(cdpId, amount)`,
+  `withdraw(cdpId, amount)`, `borrow(cdpId, amount)`, `repay(cdpId, amount)`
 
 **HyperBeatAdapter** (`src/adapters/hyperliquid/HyperBeatAdapter.sol`)
+
 - Meta vault with automated strategy management
 - Deposit, withdraw, swap operations
-- Methods: `deposit(asset, amount, vault, recipient)`, `withdraw(asset, shares, vault, recipient)`, `swap(tokenIn, tokenOut, amountIn, minAmountOut, recipient)`
+- Methods: `deposit(asset, amount, vault, recipient)`,
+  `withdraw(asset, shares, vault, recipient)`,
+  `swap(tokenIn, tokenOut, amountIn, minAmountOut, recipient)`
 
 ## Deployment
 
@@ -155,6 +181,7 @@ LIDO_WSTETH=0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0
 ### Deployment Script
 
 The unified deployment script (`script/Deploy.s.sol`) handles:
+
 - ✅ Multi-network deployment (Ethereum, Hyperliquid, testnets)
 - ✅ Incremental deployment (reuses existing contracts)
 - ✅ Automatic adapter registration
@@ -173,6 +200,7 @@ forge script script/Deploy.s.sol --rpc-url $MAINNET_RPC_URL --broadcast --verify
 ```
 
 The deployment script automatically:
+
 1. Deploys MultiSigManager for governance
 2. Deploys RedStone oracle (or uses existing)
 3. Deploys PriceValidator with oracle integration
@@ -290,7 +318,8 @@ executor.executeConditional(conditional);
 
 ### Audit Status
 
-⚠️ **NOT AUDITED** - This protocol has not undergone an external security audit. Use at your own risk.
+⚠️ **NOT AUDITED** - This protocol has not undergone an external security audit.
+Use at your own risk.
 
 ### Security Features
 
@@ -303,11 +332,13 @@ executor.executeConditional(conditional);
 
 ### Vulnerability Disclosure
 
-Please see [SECURITY.md](./SECURITY.md) for our security policy and vulnerability reporting process.
+Please see [SECURITY.md](./SECURITY.md) for our security policy and
+vulnerability reporting process.
 
 ## Gas Optimization
 
 The protocol uses several gas optimization techniques:
+
 - Via-IR compilation for complex contracts
 - Optimizer runs set to 200 for balanced optimization
 - Batch operations to amortize fixed costs
@@ -315,9 +346,11 @@ The protocol uses several gas optimization techniques:
 
 ## Upgradeability
 
-⚠️ **IMPORTANT**: Contracts are currently **NOT upgradeable**. All contracts are immutable once deployed.
+⚠️ **IMPORTANT**: Contracts are currently **NOT upgradeable**. All contracts are
+immutable once deployed.
 
 Future versions may implement:
+
 - UUPS proxy pattern for upgradeability
 - Migration mechanisms for strategy continuity
 - Versioned adapter registry
@@ -347,25 +380,30 @@ forge doc
 
 ## License
 
-This project is licensed under AGPL-3.0-only. See [LICENSE](./LICENSE) for details.
+This project is licensed under AGPL-3.0-only. See [LICENSE](./LICENSE) for
+details.
 
 **AGPL-3.0 requires:**
+
 - Source code must be made available when distributed
 - Modifications must be released under the same license
-- Network use triggers distribution requirements (modified versions served over a network must provide source)
+- Network use triggers distribution requirements (modified versions served over
+  a network must provide source)
 
 ## Resources
 
-- [Tetrics Documentation](https://docs.tetrics.com)
-- [GitHub Repository](https://github.com/tetrics/tetrics-reactor)
+- [Tetrics Documentation](https://tetrics.gitbook.io/x/)
+- [GitHub Repository](https://github.com/Tetrics-io/Executor)
 - [Security Policy](./SECURITY.md)
-- [Deployment Guide](./docs/DEPLOYMENT.md)
 
 ## Disclaimer
 
-This software is provided "as is", without warranty of any kind. Use at your own risk. The authors and contributors are not liable for any damages or losses arising from the use of this software.
+This software is provided "as is", without warranty of any kind. Use at your own
+risk. The authors and contributors are not liable for any damages or losses
+arising from the use of this software.
 
 **DeFi protocols involve significant financial risk. Always:**
+
 - Start with small amounts
 - Understand the risks
 - Review all transaction details before signing

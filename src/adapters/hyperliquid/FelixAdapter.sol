@@ -29,7 +29,11 @@ interface IFelix {
 
 /// @title FelixAdapter
 /// @notice Production adapter for Felix CDP (Collateralized Debt Position) protocol on Hyperliquid
-/// @dev Secure implementation with proper access controls and comprehensive error handling
+/// @dev Open composability pattern - functions are publicly callable to support:
+///      - Direct user calls with token approvals
+///      - Relayer-submitted transactions with Permit2 signatures
+///      - UniExecutor orchestrated multi-step strategies
+///      Security is enforced at the token approval layer, not at the adapter level.
 contract FelixAdapter is BaseAdapter {
     // ============ Constants ============
 
@@ -59,7 +63,6 @@ contract FelixAdapter is BaseAdapter {
 
     // ============ Errors ============
 
-    error OnlyExecutor();
     error InvalidAsset();
     error InvalidCDPId();
     error OpenCDPFailed(string reason);
@@ -71,11 +74,6 @@ contract FelixAdapter is BaseAdapter {
     error CDPNotOwned();
 
     // ============ Modifiers ============
-
-    modifier onlyExecutor() {
-        if (msg.sender != executor) revert OnlyExecutor();
-        _;
-    }
 
     modifier validAsset(address asset) {
         if (asset == address(0)) revert InvalidAsset();
@@ -119,7 +117,6 @@ contract FelixAdapter is BaseAdapter {
     /// @return cdpId The ID of the newly created CDP
     function openCDP(address collateral, uint256 collateralAmount, uint256 debtAmount)
         external
-        onlyExecutor
         whenInitialized
         validAsset(collateral)
         validAmount(collateralAmount)
@@ -168,7 +165,6 @@ contract FelixAdapter is BaseAdapter {
     /// @return success Whether operation was successful
     function addCollateral(uint256 cdpId, uint256 amount)
         external
-        onlyExecutor
         whenInitialized
         validAmount(amount)
         validCDPOwner(cdpId)
@@ -205,7 +201,6 @@ contract FelixAdapter is BaseAdapter {
     /// @return success Whether operation was successful
     function removeCollateral(uint256 cdpId, uint256 amount)
         external
-        onlyExecutor
         whenInitialized
         validAmount(amount)
         validCDPOwner(cdpId)
@@ -236,7 +231,6 @@ contract FelixAdapter is BaseAdapter {
     /// @return success Whether operation was successful
     function borrowMore(uint256 cdpId, uint256 amount)
         external
-        onlyExecutor
         whenInitialized
         validAmount(amount)
         validCDPOwner(cdpId)
@@ -266,7 +260,6 @@ contract FelixAdapter is BaseAdapter {
     /// @return success Whether operation was successful
     function repayDebt(uint256 cdpId, uint256 amount)
         external
-        onlyExecutor
         whenInitialized
         validAmount(amount)
         validCDPOwner(cdpId)
@@ -301,7 +294,6 @@ contract FelixAdapter is BaseAdapter {
     /// @return success Whether operation was successful
     function closeCDP(uint256 cdpId)
         external
-        onlyExecutor
         whenInitialized
         validCDPOwner(cdpId)
         returns (bool success)

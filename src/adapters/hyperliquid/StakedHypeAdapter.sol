@@ -13,7 +13,11 @@ interface IStakedHype {
 
 /// @title StakedHypeAdapter
 /// @notice Production adapter for staking HYPE to receive beHYPE on Hyperliquid
-/// @dev Follows production security patterns with proper access controls and error handling
+/// @dev Open composability pattern - functions are publicly callable to support:
+///      - Direct user calls with token approvals
+///      - Relayer-submitted transactions with Permit2 signatures
+///      - UniExecutor orchestrated multi-step strategies
+///      Security is enforced at the token approval layer, not at the adapter level.
 contract StakedHypeAdapter is BaseAdapter {
     // ============ Immutable State Variables ============
 
@@ -31,18 +35,12 @@ contract StakedHypeAdapter is BaseAdapter {
 
     // ============ Errors ============
 
-    error OnlyExecutor();
     error AlreadyInitialized();
     error InvalidStakingAmount();
     error StakingFailed(string reason);
     error UnstakingFailed(string reason);
 
     // ============ Modifiers ============
-
-    modifier onlyExecutor() {
-        if (msg.sender != executor) revert OnlyExecutor();
-        _;
-    }
 
     modifier whenInitialized() {
         require(_initialized, "Adapter not initialized");
@@ -66,12 +64,16 @@ contract StakedHypeAdapter is BaseAdapter {
     // ============ Core Functions ============
 
     /// @notice Stake HYPE to receive beHYPE
+    /// @dev Publicly callable - can be invoked by:
+    ///      - UniExecutor via delegatecall for multi-step strategies
+    ///      - Relayers submitting user-signed Permit2 transactions
+    ///      - Users directly with ETH value and proper approvals
+    ///      Caller must provide ETH value matching the amount parameter.
     /// @param amount Amount of HYPE to stake
     /// @return beHypeReceived Amount of beHYPE shares received
     function stake(uint256 amount)
         external
         payable
-        onlyExecutor
         whenInitialized
         validAmount(amount)
         returns (uint256 beHypeReceived)
@@ -102,11 +104,15 @@ contract StakedHypeAdapter is BaseAdapter {
     }
 
     /// @notice Unstake beHYPE to receive HYPE
+    /// @dev Publicly callable - can be invoked by:
+    ///      - UniExecutor via delegatecall for multi-step strategies
+    ///      - Relayers submitting user-signed Permit2 transactions
+    ///      - Users directly with beHYPE token approvals
+    ///      Caller must ensure beHYPE tokens are approved or held by this adapter.
     /// @param shares Amount of beHYPE shares to unstake
     /// @return hypeReceived Amount of HYPE received
     function unstake(uint256 shares)
         external
-        onlyExecutor
         whenInitialized
         validAmount(shares)
         returns (uint256 hypeReceived)

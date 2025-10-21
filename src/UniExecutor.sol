@@ -178,10 +178,8 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
         if (permitTransfer.owner == address(0)) {
             revert Permit2Failed("Invalid owner");
         }
-        // Enforce that the caller is the owner of the tokens for Permit2 operations
-        if (msg.sender != permitTransfer.owner) {
-            revert Permit2Failed("Caller must be owner");
-        }
+        // Note: We do NOT check msg.sender == owner to allow relayers to submit transactions
+        // The Permit2 signature itself validates that the owner authorized this transfer
 
         address recipient = permitTransfer.transferDetails.to;
         bool toExecutor = recipient == address(this);
@@ -237,8 +235,8 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
         }
 
         if (owner == address(0)) revert Permit2Failed("Invalid owner");
-        // Enforce that the caller is the owner of the tokens for Permit2 operations
-        if (msg.sender != owner) revert Permit2Failed("Caller must be owner");
+        // Note: We do NOT check msg.sender == owner to allow relayers to submit transactions
+        // The Permit2 signature itself validates that the owner authorized this transfer
 
         uint256 permittedLength = permitBatch.permitted.length;
         require(permittedLength == transferDetails.length, "Permit2 length mismatch");
@@ -314,8 +312,8 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
         }
 
         if (owner == address(0)) revert Permit2Failed("Invalid owner");
-        // Enforce that the caller is the owner of the tokens for Permit2 operations
-        if (msg.sender != owner) revert Permit2Failed("Caller must be owner");
+        // Note: We do NOT check msg.sender == owner to allow relayers to submit transactions
+        // The Permit2 signature itself validates that the owner authorized this transfer
 
         uint256 permittedLength = permitBatch.permitted.length;
         require(permittedLength == transferDetails.length, "Permit2 length mismatch");

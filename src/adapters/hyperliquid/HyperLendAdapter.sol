@@ -24,7 +24,12 @@ interface IHyperLend {
 
 /// @title HyperLendAdapter
 /// @notice Production adapter for lending and borrowing on HyperLend (Aave-like protocol on Hyperliquid)
-/// @dev Secure implementation with proper access controls and comprehensive error handling
+/// @dev Open composability pattern - functions are publicly callable to support:
+///      - Direct user calls with token approvals
+///      - Relayer-submitted transactions with Permit2 signatures
+///      - UniExecutor orchestrated multi-step strategies
+///      Security is enforced at the token approval layer, not at the adapter level.
+///      All functions validate caller has necessary token approvals or balances.
 contract HyperLendAdapter is BaseAdapter {
     // ============ Constants ============
 
@@ -51,7 +56,6 @@ contract HyperLendAdapter is BaseAdapter {
 
     // ============ Errors ============
 
-    error OnlyExecutor();
     error InvalidAsset();
     error SupplyFailed(string reason);
     error BorrowFailed(string reason);
@@ -61,11 +65,6 @@ contract HyperLendAdapter is BaseAdapter {
     error InvalidInterestRateMode();
 
     // ============ Modifiers ============
-
-    modifier onlyExecutor() {
-        if (msg.sender != executor) revert OnlyExecutor();
-        _;
-    }
 
     modifier validAsset(address asset) {
         if (asset == address(0)) revert InvalidAsset();
