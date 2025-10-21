@@ -7,10 +7,10 @@ import "../src/interfaces/IERC1271.sol";
 
 contract ERC1271Test is Test {
     UniExecutor public executor;
-    address public owner = address(0x1);
-    address public solver = address(0x2);
-    address public emergencyOperator = address(0x3);
-    address public unauthorizedUser = address(0x4);
+    address public owner;
+    address public solver;
+    address public emergencyOperator;
+    address public unauthorizedUser;
 
     uint256 public ownerPrivateKey = 0x1;
     uint256 public solverPrivateKey = 0x2;
@@ -18,7 +18,11 @@ contract ERC1271Test is Test {
     uint256 public unauthorizedPrivateKey = 0x4;
 
     function setUp() public {
-        vm.prank(owner);
+        owner = vm.addr(ownerPrivateKey);
+        solver = vm.addr(solverPrivateKey);
+        emergencyOperator = vm.addr(emergencyPrivateKey);
+        unauthorizedUser = vm.addr(unauthorizedPrivateKey);
+
         executor = new UniExecutor(owner);
         
         vm.prank(owner);
@@ -92,12 +96,12 @@ contract ERC1271Test is Test {
     }
 
     function test_SignatureValidationWithApprovedSolver() public {
-        address newSolver = address(0x5);
+        uint256 newSolverPrivateKey = 0x5;
+        address newSolver = vm.addr(newSolverPrivateKey);
         vm.prank(owner);
         executor.addApprovedSolver(newSolver);
 
         bytes32 hash = keccak256("test message");
-        uint256 newSolverPrivateKey = 0x5;
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(newSolverPrivateKey, hash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
@@ -106,7 +110,8 @@ contract ERC1271Test is Test {
     }
 
     function test_SignatureValidationAfterSolverRemoval() public {
-        address newSolver = address(0x5);
+        uint256 newSolverPrivateKey = 0x5;
+        address newSolver = vm.addr(newSolverPrivateKey);
         vm.prank(owner);
         executor.addApprovedSolver(newSolver);
         
@@ -114,7 +119,6 @@ contract ERC1271Test is Test {
         executor.removeApprovedSolver(newSolver);
 
         bytes32 hash = keccak256("test message");
-        uint256 newSolverPrivateKey = 0x5;
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(newSolverPrivateKey, hash);
         bytes memory signature = abi.encodePacked(r, s, v);
 

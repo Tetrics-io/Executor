@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 import "../BaseAdapter.sol";
@@ -27,18 +27,17 @@ interface IFelix {
 /// @dev Secure implementation with proper access controls and comprehensive error handling
 contract FelixAdapter is BaseAdapter {
     // ============ Constants ============
-    
-    // TODO: Update these addresses with actual Felix protocol addresses on Hyperliquid mainnet
-    address public constant FELIX_PROTOCOL = 0x0000000000000000000000000000000000000000; // Felix CDP protocol - UPDATE FOR PRODUCTION
-    address public constant BEHYPE = 0x0000000000000000000000000000000000000000; // beHYPE collateral token - UPDATE FOR PRODUCTION  
-    address public constant FUSDC = 0x0000000000000000000000000000000000000000; // fUSDC debt token - UPDATE FOR PRODUCTION
-    
+
     uint256 private constant MIN_COLLATERAL_RATIO = 150; // 150% minimum collateral ratio
     uint256 private constant SAFE_COLLATERAL_RATIO = 200; // 200% recommended safe ratio
-    
-    // ============ State Variables ============
-    
+
+    // ============ Immutable State Variables ============
+
     address public immutable executor;
+    address public immutable FELIX_PROTOCOL;
+    address public immutable BEHYPE;
+    address public immutable FUSDC;
+
     bool private _initialized;
     
     // ============ Events ============
@@ -89,10 +88,23 @@ contract FelixAdapter is BaseAdapter {
     }
     
     // ============ Constructor ============
-    
-    constructor(address _executor) validAddress(_executor) {
+
+    constructor(
+        address _executor,
+        address _felixProtocol,
+        address _behype,
+        address _fusdc
+    ) validAddress(_executor) {
+        require(_felixProtocol != address(0), "Invalid Felix protocol address");
+        require(_behype != address(0), "Invalid beHYPE address");
+        require(_fusdc != address(0), "Invalid fUSDC address");
+
         executor = _executor;
+        FELIX_PROTOCOL = _felixProtocol;
+        BEHYPE = _behype;
+        FUSDC = _fusdc;
         _initialized = true;
+
         emit AdapterInitialized(_executor);
     }
     

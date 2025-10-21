@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 import "../BaseAdapter.sol";
@@ -15,15 +15,12 @@ interface IStakedHype {
 /// @notice Production adapter for staking HYPE to receive beHYPE on Hyperliquid
 /// @dev Follows production security patterns with proper access controls and error handling
 contract StakedHypeAdapter is BaseAdapter {
-    // ============ Constants ============
-    
-    // TODO: Update these addresses with actual Hyperliquid protocol addresses
-    address public constant HYPE = 0x0000000000000000000000000000000000000001; // Native HYPE token on Hyperliquid - VERIFY ADDRESS
-    address public constant STAKED_HYPE = 0x0000000000000000000000000000000000000000; // beHYPE staking contract - UPDATE FOR PRODUCTION
-    
-    // ============ State Variables ============
-    
+    // ============ Immutable State Variables ============
+
     address public immutable executor;
+    address public immutable HYPE;
+    address public immutable STAKED_HYPE;
+
     bool private _initialized;
     
     // ============ Events ============
@@ -53,10 +50,20 @@ contract StakedHypeAdapter is BaseAdapter {
     }
     
     // ============ Constructor ============
-    
-    constructor(address _executor) validAddress(_executor) {
+
+    constructor(
+        address _executor,
+        address _hype,
+        address _stakedHype
+    ) validAddress(_executor) {
+        require(_hype != address(0), "Invalid HYPE address");
+        require(_stakedHype != address(0), "Invalid staked HYPE address");
+
         executor = _executor;
+        HYPE = _hype;
+        STAKED_HYPE = _stakedHype;
         _initialized = true;
+
         emit AdapterInitialized(_executor);
     }
     

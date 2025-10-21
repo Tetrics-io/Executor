@@ -41,6 +41,7 @@ contract OracleSecurityTest is Test {
         
         // Deploy executor
         executor = new UniExecutor(address(multiSig));
+        vm.prank(address(multiSig));
         executor.setPriceValidator(address(priceValidator));
         
         // Set up test prices for predictable behavior
@@ -181,17 +182,13 @@ contract OracleSecurityTest is Test {
         vm.expectRevert(abi.encodeWithSignature("InvalidPriceData()"));
         oracle.getOracleNumericValueFromTxMsg(invalidFeed);
         
-        // Test with array containing invalid feeds
+        // Test with array containing invalid feeds - should also revert
         bytes32[] memory feeds = new bytes32[](2);
         feeds[0] = keccak256("ETH");
         feeds[1] = bytes32(0); // Invalid feed
         
-        // Array function returns garbage data for invalid feeds instead of reverting
-        // This is expected behavior in test environment without RedStone validation
-        uint256[] memory feedPrices = oracle.getOracleNumericValuesFromTxMsg(feeds);
-        assertEq(feedPrices.length, 2);
-        assertEq(feedPrices[0], 4000e8); // Valid ETH price from setUp()
-        assertTrue(feedPrices[1] > 0); // Invalid feed returns garbage data
+        vm.expectRevert(abi.encodeWithSignature("InvalidPriceData()"));
+        oracle.getOracleNumericValuesFromTxMsg(feeds);
         
         // Test successful case with valid feeds that have test data
         bytes32[] memory validFeeds = new bytes32[](1);

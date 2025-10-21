@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 import "./interfaces/IPermit2.sol";
@@ -14,7 +14,8 @@ import "./security/PriceValidator.sol";
 contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     // ============ Constants ============
 
-    address public constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3; // Mainnet Permit2
+    address public constant PERMIT2 =
+        0x000000000022D473030F116dDEE9F6B43aC78BA3; // Mainnet Permit2
 
     // ============ State Variables ============
 
@@ -37,12 +38,20 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     // ============ Errors ============
     // Main errors are now defined in IUniExecutor interface
     error Permit2InvalidRecipient(address token, address recipient);
-    error Permit2InsufficientPull(address token, uint256 expected, uint256 received);
+    error Permit2InsufficientPull(
+        address token,
+        uint256 expected,
+        uint256 received
+    );
 
     // ============ Modifiers ============
 
     modifier onlySolver() {
-        if (msg.sender != address(this) && !approvedSolvers[msg.sender] && msg.sender != solver) {
+        if (
+            msg.sender != address(this) &&
+            !approvedSolvers[msg.sender] &&
+            msg.sender != solver
+        ) {
             revert OnlySolver();
         }
         _;
@@ -66,24 +75,16 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     uint256 private _status;
     bool private _inMulticall;
 
-    event DebugReentrancy(string function_name, bool inMulticall, uint256 status, address sender);
-    
     modifier nonReentrant() {
-        // Debug logging
-        emit DebugReentrancy("nonReentrant_check", _inMulticall, _status, msg.sender);
-        
         // Allow internal calls during multicall operations
         if (_inMulticall) {
-            emit DebugReentrancy("multicall_skip", _inMulticall, _status, msg.sender);
             _;
             return;
         }
         require(_status != _ENTERED, "Reentrancy");
         _status = _ENTERED;
-        emit DebugReentrancy("status_entered", _inMulticall, _status, msg.sender);
         _;
         _status = _NOT_ENTERED;
-        emit DebugReentrancy("status_exited", _inMulticall, _status, msg.sender);
     }
 
     // ============ Constructor ============
@@ -126,7 +127,9 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
 
     // ============ Emergency Functions ============
 
-    function emergencyPause(string calldata reason) external onlyEmergencyOperator {
+    function emergencyPause(
+        string calldata reason
+    ) external onlyEmergencyOperator {
         paused = true;
         emit EmergencyPause(msg.sender, reason);
     }
@@ -138,13 +141,19 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
 
     // ============ Protocol Registry ============
 
-    function addProtocol(string calldata protocol, address adapter) external onlySolver {
+    function addProtocol(
+        string calldata protocol,
+        address adapter
+    ) external onlySolver {
         protocols[protocol] = adapter;
         allowedTargets[adapter] = true;
         emit ProtocolRegistered(protocol, adapter);
     }
 
-    function registerProtocols(string[] calldata protocolNames, address[] calldata targets) external onlySolver {
+    function registerProtocols(
+        string[] calldata protocolNames,
+        address[] calldata targets
+    ) external onlySolver {
         require(protocolNames.length == targets.length, "Length mismatch");
 
         for (uint256 i = 0; i < protocolNames.length; i++) {
@@ -162,12 +171,18 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
         }
     }
 
-    function getProtocol(string calldata protocol) external view returns (address adapter) {
+    function getProtocol(
+        string calldata protocol
+    ) external view returns (address adapter) {
         return protocols[protocol];
     }
 
     /// @notice Approve a protocol or adapter to spend executor-held tokens
-    function approveToken(address token, address spender, uint256 amount) external onlySolver {
+    function approveToken(
+        address token,
+        address spender,
+        uint256 amount
+    ) external onlySolver {
         IERC20(token).approve(spender, amount);
     }
 
@@ -176,33 +191,46 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     /// @notice Execute action with Permit2 for gasless token approvals
     /// @param action The action to execute
     /// @param permitTransfer Permit2 transfer data including signature
-    function executeWithPermit2(Action calldata action, Permit2Transfer calldata permitTransfer)
-        external
-        payable
-    {
+    function executeWithPermit2(
+        Action calldata action,
+        Permit2Transfer calldata permitTransfer
+    ) external payable {
         // Custom reentrancy protection that works with multicall
         if (!_inMulticall) {
             require(_status != _ENTERED, "Reentrancy");
             _status = _ENTERED;
         }
-        
-        emit DebugReentrancy("executeWithPermit2_start", _inMulticall, _status, msg.sender);
-        if (permitTransfer.owner == address(0)) revert Permit2Failed("Invalid owner");
 
-        if (permitTransfer.transferDetails.to != address(this)) {
+        if (permitTransfer.owner == address(0))
+            revert Permit2Failed("Invalid owner");
+        // Enforce that the caller is the owner of the tokens for Permit2 operations
+        if (msg.sender != permitTransfer.owner)
+            revert Permit2Failed("Caller must be owner");
+
+        address recipient = permitTransfer.transferDetails.to;
+        bool toExecutor = recipient == address(this);
+        // Allow recipient if it's the executor, an allowed target, or the owner is directly calling
+        bool recipientAllowed = toExecutor ||
+            allowedTargets[recipient] ||
+            (msg.sender == permitTransfer.owner);
+        if (!recipientAllowed)
             revert Permit2InvalidRecipient(
-                permitTransfer.permit.permitted.token, permitTransfer.transferDetails.to
+                permitTransfer.permit.permitted.token,
+                recipient
             );
-        }
 
-        uint256 preBalance = IERC20(permitTransfer.permit.permitted.token).balanceOf(address(this));
+        address balanceAccount = toExecutor ? address(this) : recipient;
+        uint256 preBalance = IERC20(permitTransfer.permit.permitted.token)
+            .balanceOf(balanceAccount);
 
         // First, execute Permit2 transfer to pull tokens from user
         _executePermit2Transfer(permitTransfer);
 
-        uint256 postBalance = IERC20(permitTransfer.permit.permitted.token).balanceOf(address(this));
+        uint256 postBalance = IERC20(permitTransfer.permit.permitted.token)
+            .balanceOf(balanceAccount);
         uint256 received = postBalance - preBalance;
-        if (received < permitTransfer.transferDetails.requestedAmount) {
+        // Allow 2 wei tolerance for rebasing tokens like stETH that have rounding issues
+        if (received + 2 < permitTransfer.transferDetails.requestedAmount) {
             revert Permit2InsufficientPull(
                 permitTransfer.permit.permitted.token,
                 permitTransfer.transferDetails.requestedAmount,
@@ -215,14 +243,12 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
         if (!success) {
             revert ActionFailed(action.protocol, action.method, result);
         }
-        
-        emit DebugReentrancy("executeWithPermit2_end", _inMulticall, _status, msg.sender);
-        
+
         // Reset reentrancy status if we set it
         if (!_inMulticall) {
             _status = _NOT_ENTERED;
         }
-        
+
         // Execution completed
     }
 
@@ -241,37 +267,63 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
             require(_status != _ENTERED, "Reentrancy");
             _status = _ENTERED;
         }
-        
-        emit DebugReentrancy("executeBatchWithPermit2_start", _inMulticall, _status, msg.sender);
+
         if (owner == address(0)) revert Permit2Failed("Invalid owner");
-        if (permitBatch.spender != address(this)) revert Permit2Failed("Invalid spender");
+        // Enforce that the caller is the owner of the tokens for Permit2 operations
+        if (msg.sender != owner) revert Permit2Failed("Caller must be owner");
 
         uint256 permittedLength = permitBatch.permitted.length;
-        require(permittedLength == transferDetails.length, "Permit2 length mismatch");
+        require(
+            permittedLength == transferDetails.length,
+            "Permit2 length mismatch"
+        );
 
         uint256[] memory preBalances = new uint256[](permittedLength);
+        address[] memory balanceAccounts = new address[](permittedLength);
         for (uint256 i = 0; i < permittedLength; i++) {
-            if (transferDetails[i].to != address(this)) {
-                revert Permit2InvalidRecipient(permitBatch.permitted[i].token, transferDetails[i].to);
-            }
-            preBalances[i] = IERC20(permitBatch.permitted[i].token).balanceOf(address(this));
+            address recipient = transferDetails[i].to;
+            bool toExecutor = recipient == address(this);
+            // Allow recipient if it's the executor, an allowed target, or the owner is directly calling
+            bool recipientAllowed = toExecutor ||
+                allowedTargets[recipient] ||
+                (msg.sender == owner);
+            if (!recipientAllowed)
+                revert Permit2InvalidRecipient(
+                    permitBatch.permitted[i].token,
+                    recipient
+                );
+            address balanceAccount = toExecutor ? address(this) : recipient;
+            balanceAccounts[i] = balanceAccount;
+            preBalances[i] = IERC20(permitBatch.permitted[i].token).balanceOf(
+                balanceAccount
+            );
         }
 
         // Execute batch Permit2 transfer
-        IPermit2(PERMIT2).permitBatchTransferFrom(permitBatch, transferDetails, owner, signature);
+        IPermit2(PERMIT2).permitBatchTransferFrom(
+            permitBatch,
+            transferDetails,
+            owner,
+            signature
+        );
 
         // Log each token transfer
         for (uint256 i = 0; i < permittedLength; i++) {
-            uint256 postBalance =
-                IERC20(permitBatch.permitted[i].token).balanceOf(address(this));
+            uint256 postBalance = IERC20(permitBatch.permitted[i].token)
+                .balanceOf(balanceAccounts[i]);
             uint256 received = postBalance - preBalances[i];
-            if (received < transferDetails[i].requestedAmount) {
+            // Allow 2 wei tolerance for rebasing tokens like stETH that have rounding issues
+            if (received + 2 < transferDetails[i].requestedAmount) {
                 revert Permit2InsufficientPull(
-                    permitBatch.permitted[i].token, transferDetails[i].requestedAmount, received
+                    permitBatch.permitted[i].token,
+                    transferDetails[i].requestedAmount,
+                    received
                 );
             }
             emit Permit2Executed(
-                permitBatch.permitted[i].token, transferDetails[i].requestedAmount, owner
+                permitBatch.permitted[i].token,
+                transferDetails[i].requestedAmount,
+                owner
             );
         }
 
@@ -283,9 +335,7 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
 
         uint256 gasUsed = gasStart - gasleft();
         emit BatchExecuted(actions.length, gasUsed);
-        
-        emit DebugReentrancy("executeBatchWithPermit2_end", _inMulticall, _status, msg.sender);
-        
+
         // Reset reentrancy status if we set it
         if (!_inMulticall) {
             _status = _NOT_ENTERED;
@@ -309,40 +359,69 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     ) external payable {
         // This is essentially the same as the existing batch permit2 function above
         // but with the interface-compatible signature
-        
+
         // Custom reentrancy protection that works with multicall
         if (!_inMulticall) {
             require(_status != _ENTERED, "Reentrancy");
             _status = _ENTERED;
         }
-        
+
         if (owner == address(0)) revert Permit2Failed("Invalid owner");
+        // Enforce that the caller is the owner of the tokens for Permit2 operations
+        if (msg.sender != owner) revert Permit2Failed("Caller must be owner");
 
         uint256 permittedLength = permitBatch.permitted.length;
-        require(permittedLength == transferDetails.length, "Permit2 length mismatch");
+        require(
+            permittedLength == transferDetails.length,
+            "Permit2 length mismatch"
+        );
 
         uint256[] memory preBalances = new uint256[](permittedLength);
+        address[] memory balanceAccounts = new address[](permittedLength);
         for (uint256 i = 0; i < permittedLength; i++) {
-            if (transferDetails[i].to != address(this)) {
-                revert Permit2InvalidRecipient(permitBatch.permitted[i].token, transferDetails[i].to);
-            }
-            preBalances[i] = IERC20(permitBatch.permitted[i].token).balanceOf(address(this));
+            address recipient = transferDetails[i].to;
+            bool toExecutor = recipient == address(this);
+            // Allow recipient if it's the executor, an allowed target, or the owner is directly calling
+            bool recipientAllowed = toExecutor ||
+                allowedTargets[recipient] ||
+                (msg.sender == owner);
+            if (!recipientAllowed)
+                revert Permit2InvalidRecipient(
+                    permitBatch.permitted[i].token,
+                    recipient
+                );
+            address balanceAccount = toExecutor ? address(this) : recipient;
+            balanceAccounts[i] = balanceAccount;
+            preBalances[i] = IERC20(permitBatch.permitted[i].token).balanceOf(
+                balanceAccount
+            );
         }
 
         // Execute batch Permit2 transfer
-        IPermit2(PERMIT2).permitBatchTransferFrom(permitBatch, transferDetails, owner, signature);
+        IPermit2(PERMIT2).permitBatchTransferFrom(
+            permitBatch,
+            transferDetails,
+            owner,
+            signature
+        );
 
         // Log each token transfer
         for (uint256 i = 0; i < permittedLength; i++) {
-            uint256 postBalance = IERC20(permitBatch.permitted[i].token).balanceOf(address(this));
+            uint256 postBalance = IERC20(permitBatch.permitted[i].token)
+                .balanceOf(balanceAccounts[i]);
             uint256 received = postBalance - preBalances[i];
-            if (received < transferDetails[i].requestedAmount) {
+            // Allow 2 wei tolerance for rebasing tokens like stETH that have rounding issues
+            if (received + 2 < transferDetails[i].requestedAmount) {
                 revert Permit2InsufficientPull(
-                    permitBatch.permitted[i].token, transferDetails[i].requestedAmount, received
+                    permitBatch.permitted[i].token,
+                    transferDetails[i].requestedAmount,
+                    received
                 );
             }
             emit Permit2Executed(
-                permitBatch.permitted[i].token, transferDetails[i].requestedAmount, owner
+                permitBatch.permitted[i].token,
+                transferDetails[i].requestedAmount,
+                owner
             );
         }
 
@@ -354,7 +433,7 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
 
         uint256 gasUsed = gasStart - gasleft();
         emit BatchExecuted(actions.length, gasUsed);
-        
+
         // Reset reentrancy status if we set it
         if (!_inMulticall) {
             _status = _NOT_ENTERED;
@@ -365,41 +444,62 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
 
     /// @notice Execute action only if conditions are met
     /// @param conditional The conditional action to evaluate and execute
-    function executeConditional(ConditionalAction calldata conditional) external payable {
+    function executeConditional(
+        ConditionalAction calldata conditional
+    ) external payable {
         // Custom reentrancy protection that works with multicall
         if (!_inMulticall) {
             require(_status != _ENTERED, "Reentrancy");
             _status = _ENTERED;
         }
-        
-        emit DebugReentrancy("executeConditional_start", _inMulticall, _status, msg.sender);
+
         // Check condition
-        uint256 balance = IERC20(conditional.checkToken).balanceOf(address(this));
+        uint256 balance = IERC20(conditional.checkToken).balanceOf(
+            address(this)
+        );
 
         if (balance < conditional.minBalance) {
-            emit ConditionalExecuted(conditional.action.protocol, false, "Insufficient balance");
-            revert ConditionNotMet(conditional.checkToken, conditional.minBalance, balance);
+            emit ConditionalExecuted(
+                conditional.action.protocol,
+                false,
+                "Insufficient balance"
+            );
+            revert ConditionNotMet(
+                conditional.checkToken,
+                conditional.minBalance,
+                balance
+            );
         }
 
-        (bool success, bytes memory result) = _handleAction(conditional.action, false);
+        (bool success, bytes memory result) = _handleAction(
+            conditional.action,
+            false
+        );
         if (!success) {
-            revert ActionFailed(conditional.action.protocol, conditional.action.method, result);
+            revert ActionFailed(
+                conditional.action.protocol,
+                conditional.action.method,
+                result
+            );
         }
 
-        emit ConditionalExecuted(conditional.action.protocol, true, "Condition met");
-        
-        emit DebugReentrancy("executeConditional_end", _inMulticall, _status, msg.sender);
-        
+        emit ConditionalExecuted(
+            conditional.action.protocol,
+            true,
+            "Condition met"
+        );
+
         // Reset reentrancy status if we set it
         if (!_inMulticall) {
             _status = _NOT_ENTERED;
         }
     }
 
-
     /// @notice Execute multiple conditional actions
     /// @param conditionals Array of conditional actions
-    function executeConditionalBatch(ConditionalAction[] calldata conditionals) external payable {
+    function executeConditionalBatch(
+        ConditionalAction[] calldata conditionals
+    ) external payable {
         // Custom reentrancy protection that works with multicall
         if (!_inMulticall) {
             require(_status != _ENTERED, "Reentrancy");
@@ -408,17 +508,31 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
 
         for (uint256 i = 0; i < conditionals.length; i++) {
             ConditionalAction calldata conditional = conditionals[i];
-            
+
             // Check condition
-            uint256 balance = IERC20(conditional.checkToken).balanceOf(address(this));
+            uint256 balance = IERC20(conditional.checkToken).balanceOf(
+                address(this)
+            );
 
             if (balance >= conditional.minBalance) {
                 _handleAction(conditional.action, false);
-                emit ConditionalExecuted(conditional.action.protocol, true, "Condition met");
+                emit ConditionalExecuted(
+                    conditional.action.protocol,
+                    true,
+                    "Condition met"
+                );
             } else {
-                emit ConditionalExecuted(conditional.action.protocol, false, "Insufficient balance");
+                emit ConditionalExecuted(
+                    conditional.action.protocol,
+                    false,
+                    "Insufficient balance"
+                );
                 if (!conditional.action.skipOnFailure) {
-                    revert ConditionNotMet(conditional.checkToken, conditional.minBalance, balance);
+                    revert ConditionNotMet(
+                        conditional.checkToken,
+                        conditional.minBalance,
+                        balance
+                    );
                 }
             }
         }
@@ -438,46 +552,49 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
             require(_status != _ENTERED, "Reentrancy");
             _status = _ENTERED;
         }
-        
-        emit DebugReentrancy("executeAction_start", _inMulticall, _status, msg.sender);
+
         (bool success, bytes memory result) = _handleAction(action, false);
         if (!success) {
             revert ActionFailed(action.protocol, action.method, result);
         }
-        
-        emit DebugReentrancy("executeAction_end", _inMulticall, _status, msg.sender);
-        
+
         // Reset reentrancy status if we set it
         if (!_inMulticall) {
             _status = _NOT_ENTERED;
         }
-        
+
         // Execution completed
     }
 
     /// @notice Execute multiple actions with optional failure handling
-    function executeBatch(Action[] calldata actions) external payable whenNotPaused {
+    function executeBatch(
+        Action[] calldata actions
+    ) external payable whenNotPaused {
         // Custom reentrancy protection that works with multicall
         if (!_inMulticall) {
             require(_status != _ENTERED, "Reentrancy");
             _status = _ENTERED;
         }
-        
-        emit DebugReentrancy("executeBatch_start", _inMulticall, _status, msg.sender);
+
         uint256 gasStart = gasleft();
 
         for (uint256 i = 0; i < actions.length; i++) {
-            (bool success, bytes memory result) = _handleAction(actions[i], true);
+            (bool success, bytes memory result) = _handleAction(
+                actions[i],
+                true
+            );
             if (!success && !actions[i].skipOnFailure) {
-                revert ActionFailed(actions[i].protocol, actions[i].method, result);
+                revert ActionFailed(
+                    actions[i].protocol,
+                    actions[i].method,
+                    result
+                );
             }
         }
 
         uint256 gasUsed = gasStart - gasleft();
         emit BatchExecuted(actions.length, gasUsed);
-        
-        emit DebugReentrancy("executeBatch_end", _inMulticall, _status, msg.sender);
-        
+
         // Reset reentrancy status if we set it
         if (!_inMulticall) {
             _status = _NOT_ENTERED;
@@ -487,24 +604,22 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     /// @notice Enhanced multicall with value splitting
     /// @param calls Array of encoded function calls
     /// @param values Array of ETH values to send with each call
-    function multicallWithValue(bytes[] calldata calls, uint256[] calldata values)
-        external
-        payable
-    {
+    function multicallWithValue(
+        bytes[] calldata calls,
+        uint256[] calldata values
+    ) external payable {
         // Custom reentrancy protection for multicall
         require(_status != _ENTERED, "Reentrancy");
         _status = _ENTERED;
         _inMulticall = true;
-        
-        emit DebugReentrancy("multicall_start", _inMulticall, _status, msg.sender);
-        
+
         require(calls.length == values.length, "Length mismatch");
         require(msg.value == _sum(values), "Value mismatch");
 
         for (uint256 i = 0; i < calls.length; i++) {
-            emit DebugReentrancy("before_internal_call", _inMulticall, _status, msg.sender);
-            (bool success, bytes memory result) = address(this).call{value: values[i]}(calls[i]);
-            emit DebugReentrancy("after_internal_call", _inMulticall, _status, msg.sender);
+            (bool success, bytes memory result) = address(this).call{
+                value: values[i]
+            }(calls[i]);
 
             if (!success) {
                 if (result.length > 0) {
@@ -518,20 +633,23 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
 
         _inMulticall = false;
         _status = _NOT_ENTERED;
-        emit DebugReentrancy("multicall_end", _inMulticall, _status, msg.sender);
     }
 
     /// @notice Direct call for maximum flexibility
-    function directCall(address target, bytes calldata callData) external payable returns (bytes memory) {
+    function directCall(
+        address target,
+        bytes calldata callData
+    ) external payable returns (bytes memory) {
         // Custom reentrancy protection that works with multicall
         if (!_inMulticall) {
             require(_status != _ENTERED, "Reentrancy");
             _status = _ENTERED;
         }
-        
-        emit DebugReentrancy("directCall_simple_start", _inMulticall, _status, msg.sender);
+
         require(allowedTargets[target], "Target not allowed");
-        (bool success, bytes memory result) = target.call{value: msg.value}(callData);
+        (bool success, bytes memory result) = target.call{value: msg.value}(
+            callData
+        );
 
         if (!success) {
             if (result.length > 0) {
@@ -542,8 +660,6 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
             revert("Direct call failed");
         }
 
-        emit DebugReentrancy("directCall_simple_end", _inMulticall, _status, msg.sender);
-        
         // Reset reentrancy status if we set it
         if (!_inMulticall) {
             _status = _NOT_ENTERED;
@@ -564,12 +680,13 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
             require(_status != _ENTERED, "Reentrancy");
             _status = _ENTERED;
         }
-        
-        emit DebugReentrancy("directCall_start", _inMulticall, _status, msg.sender);
+
         require(allowedTargets[target], "Target not allowed");
         address originalCaller = msg.sender;
 
-        (bool success, bytes memory result) = target.call{value: msg.value}(callData);
+        (bool success, bytes memory result) = target.call{value: msg.value}(
+            callData
+        );
 
         if (!success) {
             if (result.length > 0) {
@@ -580,14 +697,14 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
             revert("Direct call failed");
         }
 
-        address forwardRecipient = recipient == address(0) ? originalCaller : recipient;
+        address forwardRecipient = recipient == address(0)
+            ? originalCaller
+            : recipient;
 
         if (tokenToForward != address(0) && forwardRecipient != address(0)) {
             _forwardToken(tokenToForward, forwardRecipient);
         }
 
-        emit DebugReentrancy("directCall_end", _inMulticall, _status, msg.sender);
-        
         // Reset reentrancy status if we set it
         if (!_inMulticall) {
             _status = _NOT_ENTERED;
@@ -598,15 +715,18 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
 
     // ============ Internal Functions ============
 
-    function _handleAction(Action memory action, bool allowFailure)
-        internal
-        returns (bool success, bytes memory result)
-    {
+    function _handleAction(
+        Action memory action,
+        bool allowFailure
+    ) internal returns (bool success, bytes memory result) {
         address target = protocols[action.protocol];
         if (target == address(0)) revert ProtocolNotFound(action.protocol);
 
         // Price validation and slippage protection if configured
-        if (bytes(action.priceAsset).length > 0 && address(priceValidator) != address(0)) {
+        if (
+            bytes(action.priceAsset).length > 0 &&
+            address(priceValidator) != address(0)
+        ) {
             _validateActionPrice(action);
         }
 
@@ -625,12 +745,22 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
         } else {
             // Post-execution slippage check
             if (action.minOutputAmount > 0 && action.token != address(0)) {
-                uint256 postBalance = IERC20(action.token).balanceOf(address(this));
+                uint256 postBalance = IERC20(action.token).balanceOf(
+                    address(this)
+                );
                 uint256 actualOutput = postBalance - preBalance;
-                
+
                 if (actualOutput < action.minOutputAmount) {
-                    emit SlippageProtected(action.protocol, action.minOutputAmount, actualOutput);
-                    revert SlippageExceeded(action.protocol, action.minOutputAmount, actualOutput);
+                    emit SlippageProtected(
+                        action.protocol,
+                        action.minOutputAmount,
+                        actualOutput
+                    );
+                    revert SlippageExceeded(
+                        action.protocol,
+                        action.minOutputAmount,
+                        actualOutput
+                    );
                 }
             }
 
@@ -648,23 +778,34 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
         return (success, result);
     }
 
-    function _executePermit2Transfer(Permit2Transfer calldata permitTransfer) internal {
-        if (permitTransfer.owner == address(0)) revert Permit2Failed("Invalid owner");
-        if (permitTransfer.permit.spender != address(this)) revert Permit2Failed("Invalid spender");
+    function _executePermit2Transfer(
+        Permit2Transfer calldata permitTransfer
+    ) internal {
+        if (permitTransfer.owner == address(0))
+            revert Permit2Failed("Invalid owner");
 
-        try IPermit2(PERMIT2).permitTransferFrom(
-            permitTransfer.permit, permitTransfer.transferDetails, permitTransfer.owner, permitTransfer.signature
-        ) {
-            emit Permit2Executed(
-                permitTransfer.permit.permitted.token,
-                permitTransfer.transferDetails.requestedAmount,
-                permitTransfer.owner
-            );
-        } catch Error(string memory reason) {
-            revert Permit2Failed(reason);
-        } catch {
-            revert Permit2Failed("Unknown error");
+        (bool success, bytes memory returndata) = PERMIT2.call(
+            abi.encodeWithSelector(
+                IPermit2.permitTransferFrom.selector,
+                permitTransfer.permit,
+                permitTransfer.transferDetails,
+                permitTransfer.owner,
+                permitTransfer.signature
+            )
+        );
+        if (!success) {
+            if (returndata.length > 0) {
+                assembly {
+                    revert(add(32, returndata), mload(returndata))
+                }
+            }
+            revert Permit2Failed("Permit2 call reverted");
         }
+        emit Permit2Executed(
+            permitTransfer.permit.permitted.token,
+            permitTransfer.transferDetails.requestedAmount,
+            permitTransfer.owner
+        );
     }
 
     function _forwardToken(address token, address recipient) internal {
@@ -674,7 +815,9 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
         }
     }
 
-    function _sum(uint256[] memory values) internal pure returns (uint256 total) {
+    function _sum(
+        uint256[] memory values
+    ) internal pure returns (uint256 total) {
         for (uint256 i = 0; i < values.length; i++) {
             total += values[i];
         }
@@ -684,16 +827,27 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     /// @param action The action containing price validation parameters
     function _validateActionPrice(Action memory action) internal {
         if (address(priceValidator) == address(0)) return;
-        
+
         bytes32 assetId = keccak256(abi.encodePacked(action.priceAsset));
-        uint256 maxSlippage = action.maxSlippageBp > 0 ? action.maxSlippageBp : 500; // Default 5%
-        
-        try priceValidator.validatePrice(assetId, 0, maxSlippage) returns (uint256 validatedPrice) {
-            emit PriceValidated(action.priceAsset, validatedPrice, action.minOutputAmount);
+        uint256 maxSlippage = action.maxSlippageBp > 0
+            ? action.maxSlippageBp
+            : 500; // Default 5%
+
+        try priceValidator.validatePrice(assetId, 0, maxSlippage) returns (
+            uint256 validatedPrice
+        ) {
+            emit PriceValidated(
+                action.priceAsset,
+                validatedPrice,
+                action.minOutputAmount
+            );
         } catch Error(string memory reason) {
             revert PriceValidationFailed(action.priceAsset, reason);
         } catch {
-            revert PriceValidationFailed(action.priceAsset, "Unknown price validation error");
+            revert PriceValidationFailed(
+                action.priceAsset,
+                "Unknown price validation error"
+            );
         }
     }
 
@@ -710,29 +864,45 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     }
 
     /// @notice Check if address is emergency operator
-    function isEmergencyOperator(address operator) external view returns (bool) {
+    function isEmergencyOperator(
+        address operator
+    ) external view returns (bool) {
         return emergencyOperators[operator];
     }
 
     // ============ Token Recovery ============
 
     /// @notice Recover stuck tokens (emergency function)
-    function recoverToken(address token, address to, uint256 amount) external onlySolver {
+    function recoverToken(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlySolver {
         IERC20(token).transfer(to, amount);
     }
 
     /// @notice Recover stuck ETH (emergency function)
-    function recoverETH(address payable to, uint256 amount) external onlySolver {
+    function recoverETH(
+        address payable to,
+        uint256 amount
+    ) external onlySolver {
         to.transfer(amount);
     }
 
     /// @notice Emergency token recovery when paused
-    function emergencyRecoverToken(address token, address to, uint256 amount) external onlyEmergencyOperator {
+    function emergencyRecoverToken(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyEmergencyOperator {
         IERC20(token).transfer(to, amount);
     }
 
     /// @notice Emergency ETH recovery when paused
-    function emergencyRecoverETH(address payable to, uint256 amount) external onlyEmergencyOperator {
+    function emergencyRecoverETH(
+        address payable to,
+        uint256 amount
+    ) external onlyEmergencyOperator {
         to.transfer(amount);
     }
 
@@ -741,7 +911,9 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     /// @notice Query if a contract implements an interface
     /// @param interfaceId The interface identifier, as specified in ERC-165
     /// @return True if the contract implements interfaceId
-    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure override returns (bool) {
         return
             interfaceId == type(IUniExecutor).interfaceId ||
             interfaceId == type(IERC165).interfaceId ||
@@ -755,20 +927,27 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     /// @param hash Hash of the data that was signed
     /// @param signature Signature bytes
     /// @return magicValue ERC1271_MAGIC_VALUE if valid, ERC1271_INVALID_SIGNATURE otherwise
-    function isValidSignature(bytes32 hash, bytes memory signature) external view override returns (bytes4) {
+    function isValidSignature(
+        bytes32 hash,
+        bytes memory signature
+    ) external view override returns (bytes4) {
         // Extract signer address from signature
         address signer = _recoverSigner(hash, signature);
-        
+
         // Check if signer is an approved solver or emergency operator
-        if (approvedSolvers[signer] || signer == solver || emergencyOperators[signer]) {
+        if (
+            approvedSolvers[signer] ||
+            signer == solver ||
+            emergencyOperators[signer]
+        ) {
             return ERC1271Constants.ERC1271_MAGIC_VALUE;
         }
-        
+
         // For Permit2 validation, check if the signer is authorized for the specific operation
         if (_isAuthorizedForPermit2(hash, signer)) {
             return ERC1271Constants.ERC1271_MAGIC_VALUE;
         }
-        
+
         return ERC1271Constants.ERC1271_INVALID_SIGNATURE;
     }
 
@@ -776,7 +955,10 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     /// @param hash The hash that was signed
     /// @param signature The signature bytes
     /// @return signer The recovered signer address
-    function _recoverSigner(bytes32 hash, bytes memory signature) internal pure returns (address) {
+    function _recoverSigner(
+        bytes32 hash,
+        bytes memory signature
+    ) internal pure returns (address) {
         if (signature.length != 65) {
             return address(0);
         }
@@ -807,50 +989,63 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     /// @param hash The hash being validated
     /// @param signer The recovered signer address
     /// @return True if authorized for this specific operation
-    function _isAuthorizedForPermit2(bytes32 hash, address signer) internal view returns (bool) {
+    function _isAuthorizedForPermit2(
+        bytes32 hash,
+        address signer
+    ) internal view returns (bool) {
         if (signer == address(0) || paused) {
             return false;
         }
-        
+
         // Check if signer is an authorized EOA
         if (_isAuthorizedEOA(signer)) {
             return true;
         }
-        
+
         // Check if signer is a contract wallet that supports ERC-1271
         if (signer.code.length > 0) {
             return _isAuthorizedContractWallet(hash, signer);
         }
-        
+
         return false;
     }
-    
+
     /// @notice Check if an EOA is authorized for Permit2 operations
     /// @param signer The signer address to check
     /// @return True if authorized EOA
     function _isAuthorizedEOA(address signer) internal view returns (bool) {
         // Authorized EOAs for Permit2 operations
-        return signer == solver || 
-               approvedSolvers[signer] || 
-               emergencyOperators[signer];
+        return
+            signer == solver ||
+            approvedSolvers[signer] ||
+            emergencyOperators[signer];
     }
-    
+
     /// @notice Check if a contract wallet is authorized through ERC-1271
     /// @param hash The hash being validated
     /// @param contractWallet The contract wallet address
     /// @return True if contract wallet validates the signature
-    function _isAuthorizedContractWallet(bytes32 hash, address contractWallet) internal view returns (bool) {
-        try IERC165(contractWallet).supportsInterface(type(IERC1271).interfaceId) returns (bool supported) {
+    function _isAuthorizedContractWallet(
+        bytes32 hash,
+        address contractWallet
+    ) internal view returns (bool) {
+        try
+            IERC165(contractWallet).supportsInterface(
+                type(IERC1271).interfaceId
+            )
+        returns (bool supported) {
             if (!supported) {
                 return false;
             }
-            
+
             // For contract wallets, we need the original signature data
             // This is a simplified approach - in production, you'd store the signature
             // or implement a more sophisticated validation mechanism
             bytes memory emptySignature = "";
-            
-            try IERC1271(contractWallet).isValidSignature(hash, emptySignature) returns (bytes4 magicValue) {
+
+            try
+                IERC1271(contractWallet).isValidSignature(hash, emptySignature)
+            returns (bytes4 magicValue) {
                 return magicValue == ERC1271Constants.ERC1271_MAGIC_VALUE;
             } catch {
                 return false;
@@ -861,19 +1056,25 @@ contract UniExecutor is IUniExecutor, IERC165, IERC1271 {
     }
 
     // ============ Testing Helpers ============
-    
+
     /// @notice Public wrapper for testing _isAuthorizedEOA
     function isAuthorizedEOA(address signer) external view returns (bool) {
         return _isAuthorizedEOA(signer);
     }
-    
+
     /// @notice Public wrapper for testing _isAuthorizedContractWallet
-    function isAuthorizedContractWallet(bytes32 hash, address contractWallet) external view returns (bool) {
+    function isAuthorizedContractWallet(
+        bytes32 hash,
+        address contractWallet
+    ) external view returns (bool) {
         return _isAuthorizedContractWallet(hash, contractWallet);
     }
-    
+
     /// @notice Public wrapper for testing _isAuthorizedForPermit2
-    function isAuthorizedForPermit2(bytes32 hash, address signer) external view returns (bool) {
+    function isAuthorizedForPermit2(
+        bytes32 hash,
+        address signer
+    ) external view returns (bool) {
         return _isAuthorizedForPermit2(hash, signer);
     }
 

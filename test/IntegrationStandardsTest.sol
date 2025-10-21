@@ -9,14 +9,16 @@ import "../src/interfaces/IUniExecutor.sol";
 
 contract IntegrationStandardsTest is Test {
     UniExecutor public executor;
-    address public owner = address(0x1);
-    address public solver = address(0x2);
+    address public owner;
+    address public solver;
     
     uint256 public ownerPrivateKey = 0x1;
     uint256 public solverPrivateKey = 0x2;
 
     function setUp() public {
-        vm.prank(owner);
+        owner = vm.addr(ownerPrivateKey);
+        solver = vm.addr(solverPrivateKey);
+        
         executor = new UniExecutor(owner);
         
         vm.prank(owner);
@@ -126,8 +128,8 @@ contract IntegrationStandardsTest is Test {
     }
 
     function test_EmergencyOperatorSignatureValidation() public {
-        address emergencyOp = address(0x999);
         uint256 emergencyPrivateKey = 0x999;
+        address emergencyOp = vm.addr(emergencyPrivateKey);
         
         vm.prank(owner);
         executor.addEmergencyOperator(emergencyOp);

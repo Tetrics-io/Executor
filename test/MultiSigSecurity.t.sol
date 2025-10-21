@@ -51,6 +51,8 @@ contract MultiSigSecurityTest is Test {
         
         // Deploy UniExecutor with MultiSig as solver
         executor = new UniExecutor(address(multiSig));
+        
+        vm.prank(address(multiSig));
         executor.setPriceValidator(address(priceValidator));
         
         // Add emergency operator to UniExecutor (must be done by solver/MultiSig)
