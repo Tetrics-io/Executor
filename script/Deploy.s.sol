@@ -111,11 +111,7 @@ contract DeployScript is Script {
         _deployExecutor(deployer);
 
         // Phase 4: Deploy protocol adapters based on network
-        if (
-            config.chainId == 31337 ||
-            config.chainId == 1 ||
-            config.chainId == 11155111
-        ) {
+        if (config.chainId == 31337 || config.chainId == 1 || config.chainId == 11155111) {
             // Ethereum or Ethereum fork
             _deployEthereumAdapters();
         }
@@ -148,9 +144,7 @@ contract DeployScript is Script {
         config.network = vm.envString("NETWORK");
         config.chainId = vm.envUint("CHAIN_ID");
         config.useRealOracle = vm.envBool("USE_REAL_ORACLE");
-        config.requiredConfirmations = vm.envUint(
-            "MULTISIG_REQUIRED_CONFIRMATIONS"
-        );
+        config.requiredConfirmations = vm.envUint("MULTISIG_REQUIRED_CONFIRMATIONS");
         config.emergencyOperator = vm.envAddress("EMERGENCY_OPERATOR");
 
         // Load multisig owners
@@ -181,9 +175,7 @@ contract DeployScript is Script {
         protocols.lidoWstETH = vm.envAddress("LIDO_WSTETH");
         protocols.wstethToken = vm.envAddress("WSTETH_TOKEN");
         protocols.morphoBlue = vm.envAddress("MORPHO_BLUE");
-        protocols.morphoWstEthUsdcMarket = vm.envAddress(
-            "MORPHO_WSTETH_USDC_MARKET"
-        );
+        protocols.morphoWstEthUsdcMarket = vm.envAddress("MORPHO_WSTETH_USDC_MARKET");
         protocols.acrossSpokePool = vm.envAddress("ACROSS_SPOKE_POOL");
         protocols.acrossWeth = vm.envAddress("ACROSS_WETH");
         protocols.weth = vm.envAddress("WETH");
@@ -216,43 +208,28 @@ contract DeployScript is Script {
             multiSig = MultiSigManager(payable(existingMultiSig));
             console.log("Using existing MultiSig:", address(multiSig));
         } else {
-            multiSig = new MultiSigManager(
-                config.multiSigOwners,
-                config.requiredConfirmations,
-                config.emergencyOperator
-            );
+            multiSig =
+                new MultiSigManager(config.multiSigOwners, config.requiredConfirmations, config.emergencyOperator);
             console.log("MultiSig deployed at:", address(multiSig));
         }
     }
 
     function _deployOracleSystem() internal {
         address existingOracle = vm.envOr("ORACLE_ADDRESS", address(0));
-        address existingPriceValidator = vm.envOr(
-            "PRICE_VALIDATOR_ADDRESS",
-            address(0)
-        );
+        address existingPriceValidator = vm.envOr("PRICE_VALIDATOR_ADDRESS", address(0));
 
         if (existingOracle != address(0)) {
             oracle = RedStoneOracle(existingOracle);
             console.log("Using existing Oracle:", address(oracle));
         } else {
             if (config.useRealOracle) {
-                address redStoneAddress = vm.envOr(
-                    "REDSTONE_ORACLE_ADDRESS",
-                    address(0)
-                );
+                address redStoneAddress = vm.envOr("REDSTONE_ORACLE_ADDRESS", address(0));
                 if (redStoneAddress != address(0)) {
                     oracle = RedStoneOracle(redStoneAddress);
-                    console.log(
-                        "Using existing RedStone Oracle:",
-                        address(oracle)
-                    );
+                    console.log("Using existing RedStone Oracle:", address(oracle));
                 } else {
                     oracle = new RedStoneOracle(address(multiSig));
-                    console.log(
-                        "RedStone Oracle deployed at:",
-                        address(oracle)
-                    );
+                    console.log("RedStone Oracle deployed at:", address(oracle));
                 }
             } else {
                 MockRedStoneOracle mockOracle = new MockRedStoneOracle();
@@ -263,10 +240,7 @@ contract DeployScript is Script {
 
         if (existingPriceValidator != address(0)) {
             priceValidator = PriceValidator(existingPriceValidator);
-            console.log(
-                "Using existing PriceValidator:",
-                address(priceValidator)
-            );
+            console.log("Using existing PriceValidator:", address(priceValidator));
         } else {
             priceValidator = new PriceValidator(address(oracle));
             console.log("PriceValidator deployed at:", address(priceValidator));
@@ -305,15 +279,9 @@ contract DeployScript is Script {
         address existingWstETH = vm.envOr("WSTETH_ADAPTER_ADDRESS", address(0));
         if (existingWstETH != address(0)) {
             wstethAdapter = WstETHAdapter(existingWstETH);
-            console.log(
-                "Using existing WstETHAdapter:",
-                address(wstethAdapter)
-            );
+            console.log("Using existing WstETHAdapter:", address(wstethAdapter));
         } else {
-            wstethAdapter = new WstETHAdapter(
-                protocols.lidoStETH,
-                protocols.wstethToken
-            );
+            wstethAdapter = new WstETHAdapter(protocols.lidoStETH, protocols.wstethToken);
             console.log("WstETHAdapter deployed at:", address(wstethAdapter));
         }
 
@@ -321,15 +289,9 @@ contract DeployScript is Script {
         address existingMorpho = vm.envOr("MORPHO_ADAPTER_ADDRESS", address(0));
         if (existingMorpho != address(0)) {
             morphoAdapter = MorphoAdapter(existingMorpho);
-            console.log(
-                "Using existing MorphoAdapter:",
-                address(morphoAdapter)
-            );
+            console.log("Using existing MorphoAdapter:", address(morphoAdapter));
         } else {
-            morphoAdapter = new MorphoAdapter(
-                protocols.morphoBlue,
-                protocols.morphoWstEthUsdcMarket
-            );
+            morphoAdapter = new MorphoAdapter(protocols.morphoBlue, protocols.morphoWstEthUsdcMarket);
             console.log("MorphoAdapter deployed at:", address(morphoAdapter));
         }
 
@@ -337,10 +299,7 @@ contract DeployScript is Script {
         address existingAcross = vm.envOr("ACROSS_ADAPTER_ADDRESS", address(0));
         if (existingAcross != address(0)) {
             acrossAdapter = AcrossAdapter(existingAcross);
-            console.log(
-                "Using existing AcrossAdapter:",
-                address(acrossAdapter)
-            );
+            console.log("Using existing AcrossAdapter:", address(acrossAdapter));
         } else {
             acrossAdapter = new AcrossAdapter(protocols.acrossSpokePool);
             console.log("AcrossAdapter deployed at:", address(acrossAdapter));
@@ -351,99 +310,53 @@ contract DeployScript is Script {
         console.log("\\nDeploying Hyperliquid Adapters...");
 
         // Deploy Hyperliquid Executor if needed
-        address existingHyperliquidExecutor = vm.envOr(
-            "HYPERLIQUID_EXECUTOR_ADDRESS",
-            address(0)
-        );
+        address existingHyperliquidExecutor = vm.envOr("HYPERLIQUID_EXECUTOR_ADDRESS", address(0));
         if (existingHyperliquidExecutor != address(0)) {
-            hyperliquidExecutor = UniExecutor(
-                payable(existingHyperliquidExecutor)
-            );
-            console.log(
-                "Using existing Hyperliquid Executor:",
-                address(hyperliquidExecutor)
-            );
+            hyperliquidExecutor = UniExecutor(payable(existingHyperliquidExecutor));
+            console.log("Using existing Hyperliquid Executor:", address(hyperliquidExecutor));
             newHyperliquidExecutorDeployed = false;
         } else {
             hyperliquidExecutor = new UniExecutor(deployer);
-            console.log(
-                "Hyperliquid Executor deployed at:",
-                address(hyperliquidExecutor)
-            );
+            console.log("Hyperliquid Executor deployed at:", address(hyperliquidExecutor));
             newHyperliquidExecutorDeployed = true;
         }
 
         // Deploy HYPE Staking Adapter
         if (protocols.hypeStaking != address(0)) {
-            address existingHypeStaking = vm.envOr(
-                "HYPE_STAKING_ADAPTER_ADDRESS",
-                address(0)
-            );
+            address existingHypeStaking = vm.envOr("HYPE_STAKING_ADAPTER_ADDRESS", address(0));
             if (existingHypeStaking != address(0)) {
-                stakedHypeAdapter = StakedHypeAdapter(
-                    payable(existingHypeStaking)
-                );
-                console.log(
-                    "Using existing StakedHypeAdapter:",
-                    address(stakedHypeAdapter)
-                );
+                stakedHypeAdapter = StakedHypeAdapter(payable(existingHypeStaking));
+                console.log("Using existing StakedHypeAdapter:", address(stakedHypeAdapter));
             } else {
-                stakedHypeAdapter = new StakedHypeAdapter(
-                    address(hyperliquidExecutor),
-                    protocols.hypeToken,
-                    protocols.hypeStaking
-                );
-                console.log(
-                    "StakedHypeAdapter deployed at:",
-                    address(stakedHypeAdapter)
-                );
+                stakedHypeAdapter =
+                    new StakedHypeAdapter(address(hyperliquidExecutor), protocols.hypeToken, protocols.hypeStaking);
+                console.log("StakedHypeAdapter deployed at:", address(stakedHypeAdapter));
             }
         }
 
         // Deploy HyperLend Adapter
         if (protocols.hyperlendPool != address(0)) {
-            address existingHyperLend = vm.envOr(
-                "HYPERLEND_ADAPTER_ADDRESS",
-                address(0)
-            );
+            address existingHyperLend = vm.envOr("HYPERLEND_ADAPTER_ADDRESS", address(0));
             if (existingHyperLend != address(0)) {
                 hyperlendAdapter = HyperLendAdapter(existingHyperLend);
-                console.log(
-                    "Using existing HyperLendAdapter:",
-                    address(hyperlendAdapter)
-                );
+                console.log("Using existing HyperLendAdapter:", address(hyperlendAdapter));
             } else {
                 hyperlendAdapter = new HyperLendAdapter(
-                    address(hyperliquidExecutor),
-                    protocols.hyperlendPool,
-                    protocols.behypeToken,
-                    protocols.hypeUsdc
+                    address(hyperliquidExecutor), protocols.hyperlendPool, protocols.behypeToken, protocols.hypeUsdc
                 );
-                console.log(
-                    "HyperLendAdapter deployed at:",
-                    address(hyperlendAdapter)
-                );
+                console.log("HyperLendAdapter deployed at:", address(hyperlendAdapter));
             }
         }
 
         // Deploy Felix Adapter
         if (protocols.felixCdp != address(0)) {
-            address existingFelix = vm.envOr(
-                "FELIX_ADAPTER_ADDRESS",
-                address(0)
-            );
+            address existingFelix = vm.envOr("FELIX_ADAPTER_ADDRESS", address(0));
             if (existingFelix != address(0)) {
                 felixAdapter = FelixAdapter(existingFelix);
-                console.log(
-                    "Using existing FelixAdapter:",
-                    address(felixAdapter)
-                );
+                console.log("Using existing FelixAdapter:", address(felixAdapter));
             } else {
                 felixAdapter = new FelixAdapter(
-                    address(hyperliquidExecutor),
-                    protocols.felixCdp,
-                    protocols.behypeToken,
-                    protocols.fusdcToken
+                    address(hyperliquidExecutor), protocols.felixCdp, protocols.behypeToken, protocols.fusdcToken
                 );
                 console.log("FelixAdapter deployed at:", address(felixAdapter));
             }
@@ -451,16 +364,10 @@ contract DeployScript is Script {
 
         // Deploy HyperBeat Adapter
         if (protocols.hyperbeatVault != address(0)) {
-            address existingHyperBeat = vm.envOr(
-                "HYPERBEAT_ADAPTER_ADDRESS",
-                address(0)
-            );
+            address existingHyperBeat = vm.envOr("HYPERBEAT_ADAPTER_ADDRESS", address(0));
             if (existingHyperBeat != address(0)) {
                 hyperbeatAdapter = HyperBeatAdapter(existingHyperBeat);
-                console.log(
-                    "Using existing HyperBeatAdapter:",
-                    address(hyperbeatAdapter)
-                );
+                console.log("Using existing HyperBeatAdapter:", address(hyperbeatAdapter));
             } else {
                 hyperbeatAdapter = new HyperBeatAdapter(
                     address(hyperliquidExecutor),
@@ -470,10 +377,7 @@ contract DeployScript is Script {
                     protocols.metaVault,
                     protocols.deltaNeutralVault
                 );
-                console.log(
-                    "HyperBeatAdapter deployed at:",
-                    address(hyperbeatAdapter)
-                );
+                console.log("HyperBeatAdapter deployed at:", address(hyperbeatAdapter));
             }
         }
     }
@@ -482,11 +386,7 @@ contract DeployScript is Script {
         console.log("\\nInitializing System...");
 
         // Register Ethereum protocols only when we deployed a fresh executor
-        if (
-            address(lidoAdapter) != address(0) &&
-            address(executor) != address(0) &&
-            newExecutorDeployed
-        ) {
+        if (address(lidoAdapter) != address(0) && address(executor) != address(0) && newExecutorDeployed) {
             string[] memory protocolNames = new string[](4);
             address[] memory targets = new address[](4);
 
@@ -515,12 +415,8 @@ contract DeployScript is Script {
             if (address(hyperbeatAdapter) != address(0)) protocolCount++;
 
             if (protocolCount > 0 && newHyperliquidExecutorDeployed) {
-                string[] memory hyperliquidProtocols = new string[](
-                    protocolCount
-                );
-                address[] memory hyperliquidTargets = new address[](
-                    protocolCount
-                );
+                string[] memory hyperliquidProtocols = new string[](protocolCount);
+                address[] memory hyperliquidTargets = new address[](protocolCount);
 
                 uint256 index = 0;
                 if (address(stakedHypeAdapter) != address(0)) {
@@ -544,10 +440,7 @@ contract DeployScript is Script {
                     index++;
                 }
 
-                hyperliquidExecutor.registerProtocols(
-                    hyperliquidProtocols,
-                    hyperliquidTargets
-                );
+                hyperliquidExecutor.registerProtocols(hyperliquidProtocols, hyperliquidTargets);
                 console.log("Hyperliquid protocols registered");
             }
         }
@@ -556,10 +449,7 @@ contract DeployScript is Script {
         if (address(executor) != address(0) && newExecutorDeployed) {
             executor.addEmergencyOperator(config.emergencyOperator);
         }
-        if (
-            address(hyperliquidExecutor) != address(0) &&
-            newHyperliquidExecutorDeployed
-        ) {
+        if (address(hyperliquidExecutor) != address(0) && newHyperliquidExecutorDeployed) {
             hyperliquidExecutor.addEmergencyOperator(config.emergencyOperator);
         }
 
@@ -574,105 +464,99 @@ contract DeployScript is Script {
         // the values that should be updated.
 
         console.log("Update .env file with these addresses:");
-        if (address(multiSig) != address(0))
+        if (address(multiSig) != address(0)) {
             console.log("MULTISIG_ADDRESS=%s", address(multiSig));
-        if (address(oracle) != address(0))
+        }
+        if (address(oracle) != address(0)) {
             console.log("ORACLE_ADDRESS=%s", address(oracle));
-        if (address(priceValidator) != address(0))
+        }
+        if (address(priceValidator) != address(0)) {
             console.log("PRICE_VALIDATOR_ADDRESS=%s", address(priceValidator));
-        if (address(executor) != address(0))
+        }
+        if (address(executor) != address(0)) {
             console.log("EXECUTOR_ADDRESS=%s", address(executor));
-        if (address(lidoAdapter) != address(0))
+        }
+        if (address(lidoAdapter) != address(0)) {
             console.log("LIDO_ADAPTER_ADDRESS=%s", address(lidoAdapter));
-        if (address(wstethAdapter) != address(0))
+        }
+        if (address(wstethAdapter) != address(0)) {
             console.log("WSTETH_ADAPTER_ADDRESS=%s", address(wstethAdapter));
-        if (address(morphoAdapter) != address(0))
+        }
+        if (address(morphoAdapter) != address(0)) {
             console.log("MORPHO_ADAPTER_ADDRESS=%s", address(morphoAdapter));
-        if (address(acrossAdapter) != address(0))
+        }
+        if (address(acrossAdapter) != address(0)) {
             console.log("ACROSS_ADAPTER_ADDRESS=%s", address(acrossAdapter));
-        if (address(hyperliquidExecutor) != address(0))
-            console.log(
-                "HYPERLIQUID_EXECUTOR_ADDRESS=%s",
-                address(hyperliquidExecutor)
-            );
-        if (address(stakedHypeAdapter) != address(0))
-            console.log(
-                "HYPE_STAKING_ADAPTER_ADDRESS=%s",
-                address(stakedHypeAdapter)
-            );
-        if (address(hyperlendAdapter) != address(0))
-            console.log(
-                "HYPERLEND_ADAPTER_ADDRESS=%s",
-                address(hyperlendAdapter)
-            );
-        if (address(felixAdapter) != address(0))
+        }
+        if (address(hyperliquidExecutor) != address(0)) {
+            console.log("HYPERLIQUID_EXECUTOR_ADDRESS=%s", address(hyperliquidExecutor));
+        }
+        if (address(stakedHypeAdapter) != address(0)) {
+            console.log("HYPE_STAKING_ADAPTER_ADDRESS=%s", address(stakedHypeAdapter));
+        }
+        if (address(hyperlendAdapter) != address(0)) {
+            console.log("HYPERLEND_ADAPTER_ADDRESS=%s", address(hyperlendAdapter));
+        }
+        if (address(felixAdapter) != address(0)) {
             console.log("FELIX_ADAPTER_ADDRESS=%s", address(felixAdapter));
-        if (address(hyperbeatAdapter) != address(0))
-            console.log(
-                "HYPERBEAT_ADAPTER_ADDRESS=%s",
-                address(hyperbeatAdapter)
-            );
+        }
+        if (address(hyperbeatAdapter) != address(0)) {
+            console.log("HYPERBEAT_ADAPTER_ADDRESS=%s", address(hyperbeatAdapter));
+        }
     }
 
     function _printDeploymentSummary() internal view {
         console.log("\\n=== DEPLOYMENT COMPLETE ===");
-        console.log(
-            "Network: %s (Chain ID: %s)",
-            config.network,
-            config.chainId
-        );
+        console.log("Network: %s (Chain ID: %s)", config.network, config.chainId);
         console.log("Use Real Oracle: %s", config.useRealOracle);
 
         console.log("\\nCORE CONTRACTS:");
-        if (address(multiSig) != address(0))
+        if (address(multiSig) != address(0)) {
             console.log("  MultiSig: %s", address(multiSig));
-        if (address(oracle) != address(0))
+        }
+        if (address(oracle) != address(0)) {
             console.log("  Oracle: %s", address(oracle));
-        if (address(priceValidator) != address(0))
+        }
+        if (address(priceValidator) != address(0)) {
             console.log("  PriceValidator: %s", address(priceValidator));
-        if (address(executor) != address(0))
+        }
+        if (address(executor) != address(0)) {
             console.log("  Executor: %s", address(executor));
+        }
 
         console.log("\\nETHEREUM ADAPTERS:");
-        if (address(lidoAdapter) != address(0))
+        if (address(lidoAdapter) != address(0)) {
             console.log("  LidoAdapter: %s", address(lidoAdapter));
-        if (address(wstethAdapter) != address(0))
+        }
+        if (address(wstethAdapter) != address(0)) {
             console.log("  WstETHAdapter: %s", address(wstethAdapter));
-        if (address(morphoAdapter) != address(0))
+        }
+        if (address(morphoAdapter) != address(0)) {
             console.log("  MorphoAdapter: %s", address(morphoAdapter));
-        if (address(acrossAdapter) != address(0))
+        }
+        if (address(acrossAdapter) != address(0)) {
             console.log("  AcrossAdapter: %s", address(acrossAdapter));
+        }
 
         if (address(hyperliquidExecutor) != address(0)) {
             console.log("\\nHYPERLIQUID CONTRACTS:");
-            console.log(
-                "  HyperliquidExecutor: %s",
-                address(hyperliquidExecutor)
-            );
-            if (address(stakedHypeAdapter) != address(0))
-                console.log(
-                    "  StakedHypeAdapter: %s",
-                    address(stakedHypeAdapter)
-                );
-            if (address(hyperlendAdapter) != address(0))
-                console.log(
-                    "  HyperLendAdapter: %s",
-                    address(hyperlendAdapter)
-                );
-            if (address(felixAdapter) != address(0))
+            console.log("  HyperliquidExecutor: %s", address(hyperliquidExecutor));
+            if (address(stakedHypeAdapter) != address(0)) {
+                console.log("  StakedHypeAdapter: %s", address(stakedHypeAdapter));
+            }
+            if (address(hyperlendAdapter) != address(0)) {
+                console.log("  HyperLendAdapter: %s", address(hyperlendAdapter));
+            }
+            if (address(felixAdapter) != address(0)) {
                 console.log("  FelixAdapter: %s", address(felixAdapter));
-            if (address(hyperbeatAdapter) != address(0))
-                console.log(
-                    "  HyperBeatAdapter: %s",
-                    address(hyperbeatAdapter)
-                );
+            }
+            if (address(hyperbeatAdapter) != address(0)) {
+                console.log("  HyperBeatAdapter: %s", address(hyperbeatAdapter));
+            }
         }
 
         console.log("\\nSECURITY:");
-        console.log(
-            "  MultiSig Required Confirmations: %s",
-            config.requiredConfirmations
-        );
+        console.log("  MultiSig Required Confirmations: %s", config.requiredConfirmations);
         console.log("  Emergency Operator: %s", config.emergencyOperator);
         console.log("  Price Validation: Enabled");
 
@@ -693,17 +577,13 @@ contract MockRedStoneOracle {
         prices[keccak256(abi.encodePacked("HYPE"))] = 25 * 1e8;
     }
 
-    function getOracleNumericValueFromTxMsg(
-        bytes32 dataFeedId
-    ) external view returns (uint256) {
+    function getOracleNumericValueFromTxMsg(bytes32 dataFeedId) external view returns (uint256) {
         uint256 price = prices[dataFeedId];
         require(price > 0, "Price not found");
         return price;
     }
 
-    function getOracleNumericValuesFromTxMsg(
-        bytes32[] memory dataFeedIds
-    ) external view returns (uint256[] memory) {
+    function getOracleNumericValuesFromTxMsg(bytes32[] memory dataFeedIds) external view returns (uint256[] memory) {
         uint256[] memory result = new uint256[](dataFeedIds.length);
         for (uint256 i = 0; i < dataFeedIds.length; i++) {
             result[i] = prices[dataFeedIds[i]];
@@ -712,10 +592,7 @@ contract MockRedStoneOracle {
         return result;
     }
 
-    function validateRedStoneData(
-        bytes32,
-        uint256
-    ) external pure returns (bool) {
+    function validateRedStoneData(bytes32, uint256) external pure returns (bool) {
         return true;
     }
 }

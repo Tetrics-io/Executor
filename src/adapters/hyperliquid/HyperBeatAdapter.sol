@@ -8,13 +8,9 @@ interface IHyperBeat {
     function withdraw(address asset, uint256 shares, address recipient) external returns (uint256 amount);
     function getVaultShares(address user, address vault) external view returns (uint256);
     function getVaultAssets(address user, address vault) external view returns (uint256);
-    function swap(
-        address tokenIn,
-        address tokenOut,
-        uint256 amountIn,
-        uint256 minAmountOut,
-        address recipient
-    ) external returns (uint256 amountOut);
+    function swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, address recipient)
+        external
+        returns (uint256 amountOut);
 }
 
 /// @title HyperBeatAdapter
@@ -31,16 +27,20 @@ contract HyperBeatAdapter is BaseAdapter {
     address public immutable DELTA_NEUTRAL_VAULT;
 
     bool private _initialized;
-    
+
     // ============ Events ============
-    
-    event AssetDeposited(address indexed user, address indexed asset, address indexed vault, uint256 amount, uint256 shares);
-    event AssetWithdrawn(address indexed user, address indexed asset, address indexed vault, uint256 shares, uint256 amount);
+
+    event AssetDeposited(
+        address indexed user, address indexed asset, address indexed vault, uint256 amount, uint256 shares
+    );
+    event AssetWithdrawn(
+        address indexed user, address indexed asset, address indexed vault, uint256 shares, uint256 amount
+    );
     event SwapExecuted(address indexed user, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
     event AdapterInitialized(address indexed executor);
-    
+
     // ============ Errors ============
-    
+
     error OnlyExecutor();
     error InvalidAsset();
     error InvalidVault();
@@ -48,29 +48,29 @@ contract HyperBeatAdapter is BaseAdapter {
     error WithdrawFailed(string reason);
     error SwapFailed(string reason);
     error InsufficientBalance();
-    
+
     // ============ Modifiers ============
-    
+
     modifier onlyExecutor() {
         if (msg.sender != executor) revert OnlyExecutor();
         _;
     }
-    
+
     modifier validAsset(address asset) {
         if (asset == address(0)) revert InvalidAsset();
         _;
     }
-    
+
     modifier validVault(address vault) {
         if (vault != META_VAULT && vault != DELTA_NEUTRAL_VAULT) revert InvalidVault();
         _;
     }
-    
+
     modifier whenInitialized() {
         require(_initialized, "Adapter not initialized");
         _;
     }
-    
+
     // ============ Constructor ============
 
     constructor(
@@ -97,7 +97,7 @@ contract HyperBeatAdapter is BaseAdapter {
 
         emit AdapterInitialized(_executor);
     }
-    
+
     // ============ Core Functions ============
 
     /// @notice Deposit asset into HyperBeat vault strategy
@@ -189,13 +189,7 @@ contract HyperBeatAdapter is BaseAdapter {
     /// @param minAmountOut Minimum output amount for slippage protection
     /// @param recipient Recipient of swapped tokens
     /// @return amountOut Actual output amount received
-    function swap(
-        address tokenIn,
-        address tokenOut,
-        uint256 amountIn,
-        uint256 minAmountOut,
-        address recipient
-    )
+    function swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, address recipient)
         external
         whenInitialized
         validAsset(tokenIn)
@@ -215,13 +209,9 @@ contract HyperBeatAdapter is BaseAdapter {
         _safeApprove(tokenIn, HYPERBEAT_PROTOCOL, amountIn);
 
         // Execute swap through aggregator
-        try IHyperBeat(HYPERBEAT_PROTOCOL).swap(
-            tokenIn,
-            tokenOut,
-            amountIn,
-            minAmountOut,
-            address(this)
-        ) returns (uint256 outputAmount) {
+        try IHyperBeat(HYPERBEAT_PROTOCOL).swap(tokenIn, tokenOut, amountIn, minAmountOut, address(this)) returns (
+            uint256 outputAmount
+        ) {
             amountOut = outputAmount;
             emit SwapExecuted(recipient, tokenIn, tokenOut, amountIn, amountOut);
 
@@ -235,9 +225,9 @@ contract HyperBeatAdapter is BaseAdapter {
 
         return amountOut;
     }
-    
+
     // ============ View Functions ============
-    
+
     /// @notice Get user's vault shares
     /// @param user User address
     /// @param vault Vault address
@@ -245,7 +235,7 @@ contract HyperBeatAdapter is BaseAdapter {
     function getVaultShares(address user, address vault) external view returns (uint256) {
         return IHyperBeat(HYPERBEAT_PROTOCOL).getVaultShares(user, vault);
     }
-    
+
     /// @notice Get user's underlying assets in vault
     /// @param user User address
     /// @param vault Vault address
@@ -253,7 +243,7 @@ contract HyperBeatAdapter is BaseAdapter {
     function getVaultAssets(address user, address vault) external view returns (uint256) {
         return IHyperBeat(HYPERBEAT_PROTOCOL).getVaultAssets(user, vault);
     }
-    
+
     /// @notice Check if adapter is initialized
     /// @return True if initialized
     function isInitialized() external view returns (bool) {

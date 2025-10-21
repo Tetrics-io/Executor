@@ -20,12 +20,8 @@ interface IMorphoBlue {
         bytes calldata data
     ) external returns (uint256, uint256);
 
-    function supplyCollateral(
-        MarketParams memory marketParams,
-        uint256 assets,
-        address onBehalf,
-        bytes calldata data
-    ) external;
+    function supplyCollateral(MarketParams memory marketParams, uint256 assets, address onBehalf, bytes calldata data)
+        external;
 
     function borrow(
         MarketParams memory marketParams,
@@ -85,13 +81,8 @@ contract HyperLiquidMorphoAdapter {
         }
 
         // Create market params for USDC/beHYPE market
-        IMorphoBlue.MarketParams memory params = IMorphoBlue.MarketParams({
-            loanToken: USDC,
-            collateralToken: BEHYPE,
-            oracle: ORACLE,
-            irm: IRM,
-            lltv: LLTV
-        });
+        IMorphoBlue.MarketParams memory params =
+            IMorphoBlue.MarketParams({loanToken: USDC, collateralToken: BEHYPE, oracle: ORACLE, irm: IRM, lltv: LLTV});
 
         // Approve Morpho to take USDC
         IERC20(USDC).approve(MORPHO_BLUE, amount);
@@ -113,11 +104,7 @@ contract HyperLiquidMorphoAdapter {
     /// @param collateralAmount Amount of beHYPE to supply as collateral
     /// @param borrowAmount Amount of USDC to borrow
     /// @param recipient Recipient of position and borrowed funds
-    function supplyCollateralAndBorrow(
-        uint256 collateralAmount,
-        uint256 borrowAmount,
-        address recipient
-    ) external {
+    function supplyCollateralAndBorrow(uint256 collateralAmount, uint256 borrowAmount, address recipient) external {
         require(collateralAmount > 0, "Invalid collateral");
         require(borrowAmount > 0, "Invalid borrow amount");
         require(recipient != address(0), "Invalid recipient");
@@ -129,13 +116,8 @@ contract HyperLiquidMorphoAdapter {
         }
 
         // Create market params
-        IMorphoBlue.MarketParams memory params = IMorphoBlue.MarketParams({
-            loanToken: USDC,
-            collateralToken: BEHYPE,
-            oracle: ORACLE,
-            irm: IRM,
-            lltv: LLTV
-        });
+        IMorphoBlue.MarketParams memory params =
+            IMorphoBlue.MarketParams({loanToken: USDC, collateralToken: BEHYPE, oracle: ORACLE, irm: IRM, lltv: LLTV});
 
         // Approve Morpho to take beHYPE collateral
         IERC20(BEHYPE).approve(MORPHO_BLUE, collateralAmount);
@@ -171,13 +153,8 @@ contract HyperLiquidMorphoAdapter {
         require(amount > 0, "Invalid amount");
         require(recipient != address(0), "Invalid recipient");
 
-        IMorphoBlue.MarketParams memory params = IMorphoBlue.MarketParams({
-            loanToken: USDC,
-            collateralToken: BEHYPE,
-            oracle: ORACLE,
-            irm: IRM,
-            lltv: LLTV
-        });
+        IMorphoBlue.MarketParams memory params =
+            IMorphoBlue.MarketParams({loanToken: USDC, collateralToken: BEHYPE, oracle: ORACLE, irm: IRM, lltv: LLTV});
 
         // Withdraw from Morpho
         (uint256 assetsWithdrawn, uint256 sharesBurned) = IMorphoBlue(MORPHO_BLUE).withdraw(

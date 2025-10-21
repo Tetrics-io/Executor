@@ -42,7 +42,7 @@ abstract contract BaseAdapter {
     function _safeTransfer(address token, address recipient, uint256 amount) internal {
         require(amount > 0, "Transfer amount must be greater than zero");
         require(recipient != address(0), "Cannot transfer to zero address");
-        
+
         bool success = IERC20(token).transfer(recipient, amount);
         require(success, "Token transfer failed");
     }
@@ -56,7 +56,7 @@ abstract contract BaseAdapter {
         require(amount > 0, "Transfer amount must be greater than zero");
         require(from != address(0), "Cannot transfer from zero address");
         require(to != address(0), "Cannot transfer to zero address");
-        
+
         bool success = IERC20(token).transferFrom(from, to, amount);
         require(success, "Token transferFrom failed");
     }
@@ -67,13 +67,13 @@ abstract contract BaseAdapter {
     /// @param amount The amount to approve
     function _safeApprove(address token, address spender, uint256 amount) internal {
         require(spender != address(0), "Cannot approve zero address");
-        
+
         // Reset approval to 0 first to handle tokens that require it
         if (IERC20(token).allowance(address(this), spender) > 0) {
             bool resetSuccess = IERC20(token).approve(spender, 0);
             require(resetSuccess, "Failed to reset approval");
         }
-        
+
         bool approveSuccess = IERC20(token).approve(spender, amount);
         require(approveSuccess, "Token approval failed");
     }
@@ -91,19 +91,19 @@ abstract contract BaseAdapter {
     /// @param requiredAmount The required amount
     /// @param user The user address to pull tokens from if needed
     /// @return actualAmount The actual amount available after transfers
-    function _ensureBalance(address token, uint256 requiredAmount, address user) 
-        internal 
-        returns (uint256 actualAmount) 
+    function _ensureBalance(address token, uint256 requiredAmount, address user)
+        internal
+        returns (uint256 actualAmount)
     {
         uint256 adapterBalance = _getBalance(token, address(this));
-        
+
         if (adapterBalance >= requiredAmount) {
             return requiredAmount;
         }
-        
+
         uint256 shortfall = requiredAmount - adapterBalance;
         uint256 userBalance = _getBalance(token, user);
-        
+
         if (userBalance < shortfall) {
             // Use all available tokens (adapter + user)
             if (userBalance > 0) {

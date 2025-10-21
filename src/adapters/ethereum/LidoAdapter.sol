@@ -11,7 +11,7 @@ interface ILido {
 /// @notice Adapter for depositing ETH to Lido to get stETH
 contract LidoAdapter is BaseAdapter {
     address public immutable LIDO;
-    
+
     /// @notice Initialize the adapter with Lido contract address
     /// @param _lidoAddress Address of the Lido stETH contract
     constructor(address _lidoAddress) {
@@ -24,12 +24,7 @@ contract LidoAdapter is BaseAdapter {
     /// @notice Deposit ETH to Lido and get stETH for a recipient
     /// @param recipient Address that should receive resulting stETH
     /// @return stEthAmount The amount of stETH received
-    function depositETH(address recipient) 
-        external 
-        payable 
-        validAmount(msg.value) 
-        returns (uint256 stEthAmount) 
-    {
+    function depositETH(address recipient) external payable validAmount(msg.value) returns (uint256 stEthAmount) {
         address targetRecipient = _getTargetRecipient(recipient);
 
         // Deposit ETH to Lido to get stETH

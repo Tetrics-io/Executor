@@ -24,10 +24,10 @@ contract ERC1271Test is Test {
         unauthorizedUser = vm.addr(unauthorizedPrivateKey);
 
         executor = new UniExecutor(owner);
-        
+
         vm.prank(owner);
         executor.setSolver(solver);
-        
+
         vm.prank(owner);
         executor.addEmergencyOperator(emergencyOperator);
     }
@@ -56,7 +56,11 @@ contract ERC1271Test is Test {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         bytes4 result = executor.isValidSignature(hash, signature);
-        assertEq(result, ERC1271Constants.ERC1271_MAGIC_VALUE, "Should return magic value for valid emergency operator signature");
+        assertEq(
+            result,
+            ERC1271Constants.ERC1271_MAGIC_VALUE,
+            "Should return magic value for valid emergency operator signature"
+        );
     }
 
     function test_InvalidSignatureFromUnauthorizedUser() public {
@@ -65,13 +69,15 @@ contract ERC1271Test is Test {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         bytes4 result = executor.isValidSignature(hash, signature);
-        assertEq(result, ERC1271Constants.ERC1271_INVALID_SIGNATURE, "Should return invalid signature for unauthorized user");
+        assertEq(
+            result, ERC1271Constants.ERC1271_INVALID_SIGNATURE, "Should return invalid signature for unauthorized user"
+        );
     }
 
     function test_InvalidSignatureWrongHash() public {
         bytes32 originalHash = keccak256("original message");
         bytes32 differentHash = keccak256("different message");
-        
+
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, originalHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
@@ -84,7 +90,11 @@ contract ERC1271Test is Test {
         bytes memory invalidSignature = abi.encodePacked(bytes32(0), bytes32(0), uint8(0));
 
         bytes4 result = executor.isValidSignature(hash, invalidSignature);
-        assertEq(result, ERC1271Constants.ERC1271_INVALID_SIGNATURE, "Should return invalid signature for malformed signature");
+        assertEq(
+            result,
+            ERC1271Constants.ERC1271_INVALID_SIGNATURE,
+            "Should return invalid signature for malformed signature"
+        );
     }
 
     function test_InvalidSignatureWrongLength() public {
@@ -106,7 +116,9 @@ contract ERC1271Test is Test {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         bytes4 result = executor.isValidSignature(hash, signature);
-        assertEq(result, ERC1271Constants.ERC1271_MAGIC_VALUE, "Should return magic value for approved solver signature");
+        assertEq(
+            result, ERC1271Constants.ERC1271_MAGIC_VALUE, "Should return magic value for approved solver signature"
+        );
     }
 
     function test_SignatureValidationAfterSolverRemoval() public {
@@ -114,7 +126,7 @@ contract ERC1271Test is Test {
         address newSolver = vm.addr(newSolverPrivateKey);
         vm.prank(owner);
         executor.addApprovedSolver(newSolver);
-        
+
         vm.prank(owner);
         executor.removeApprovedSolver(newSolver);
 
@@ -123,7 +135,9 @@ contract ERC1271Test is Test {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         bytes4 result = executor.isValidSignature(hash, signature);
-        assertEq(result, ERC1271Constants.ERC1271_INVALID_SIGNATURE, "Should return invalid signature after solver removal");
+        assertEq(
+            result, ERC1271Constants.ERC1271_INVALID_SIGNATURE, "Should return invalid signature after solver removal"
+        );
     }
 
     function test_Permit2SignatureValidation() public {
@@ -132,7 +146,9 @@ contract ERC1271Test is Test {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         bytes4 result = executor.isValidSignature(permit2Hash, signature);
-        assertEq(result, ERC1271Constants.ERC1271_MAGIC_VALUE, "Should validate Permit2 signatures from authorized signers");
+        assertEq(
+            result, ERC1271Constants.ERC1271_MAGIC_VALUE, "Should validate Permit2 signatures from authorized signers"
+        );
     }
 
     function test_GasUsageForSignatureValidation() public {
@@ -148,8 +164,14 @@ contract ERC1271Test is Test {
     }
 
     function test_ERC1271ComplianceConstants() public {
-        assertEq(uint32(ERC1271Constants.ERC1271_MAGIC_VALUE), uint32(0x1626ba7e), "Magic value should match ERC-1271 spec");
-        assertEq(uint32(ERC1271Constants.ERC1271_INVALID_SIGNATURE), uint32(0xffffffff), "Invalid signature value should match ERC-1271 spec");
+        assertEq(
+            uint32(ERC1271Constants.ERC1271_MAGIC_VALUE), uint32(0x1626ba7e), "Magic value should match ERC-1271 spec"
+        );
+        assertEq(
+            uint32(ERC1271Constants.ERC1271_INVALID_SIGNATURE),
+            uint32(0xffffffff),
+            "Invalid signature value should match ERC-1271 spec"
+        );
     }
 
     function test_EdgeCaseEmptySignature() public {
@@ -157,7 +179,9 @@ contract ERC1271Test is Test {
         bytes memory emptySignature = "";
 
         bytes4 result = executor.isValidSignature(hash, emptySignature);
-        assertEq(result, ERC1271Constants.ERC1271_INVALID_SIGNATURE, "Should return invalid signature for empty signature");
+        assertEq(
+            result, ERC1271Constants.ERC1271_INVALID_SIGNATURE, "Should return invalid signature for empty signature"
+        );
     }
 
     function test_EdgeCaseZeroHash() public {

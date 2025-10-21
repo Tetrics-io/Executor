@@ -25,7 +25,7 @@ interface IAcrossSpokePool {
 contract AcrossAdapter {
     address public immutable ACROSS_SPOKE_POOL;
     address public immutable USDC;
-    
+
     /// @notice Initialize the adapter with Across protocol addresses
     /// @param _spokePool Address of the Across SpokePool contract
     constructor(address _spokePool) {

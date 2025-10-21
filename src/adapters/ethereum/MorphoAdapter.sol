@@ -35,19 +35,16 @@ contract MorphoAdapter {
     address public immutable ORACLE;
     address public immutable IRM;
     uint256 public immutable LLTV;
-    
+
     /// @notice Initialize the adapter with Morpho protocol addresses
     /// @param _morphoBlue Address of the Morpho Blue protocol
     /// @param _wstethUsdcMarket Address of the wstETH/USDC market configuration
-    constructor(
-        address _morphoBlue,
-        address _wstethUsdcMarket
-    ) {
+    constructor(address _morphoBlue, address _wstethUsdcMarket) {
         require(_morphoBlue != address(0), "Invalid Morpho Blue address");
         require(_wstethUsdcMarket != address(0), "Invalid market address");
-        
+
         MORPHO_BLUE = _morphoBlue;
-        
+
         // For now, we'll hardcode the market parameters
         // In a more sophisticated implementation, these could be read from the market contract
         USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;

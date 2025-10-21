@@ -5,17 +5,21 @@ import "../BaseAdapter.sol";
 
 interface IHyperLend {
     function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
-    function borrow(address asset, uint256 amount, uint256 interestRateMode, uint16 referralCode, address onBehalfOf) external;
+    function borrow(address asset, uint256 amount, uint256 interestRateMode, uint16 referralCode, address onBehalfOf)
+        external;
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
     function repay(address asset, uint256 amount, uint256 rateMode, address onBehalfOf) external returns (uint256);
-    function getUserAccountData(address user) external view returns (
-        uint256 totalCollateralETH,
-        uint256 totalDebtETH,
-        uint256 availableBorrowsETH,
-        uint256 currentLiquidationThreshold,
-        uint256 ltv,
-        uint256 healthFactor
-    );
+    function getUserAccountData(address user)
+        external
+        view
+        returns (
+            uint256 totalCollateralETH,
+            uint256 totalDebtETH,
+            uint256 availableBorrowsETH,
+            uint256 currentLiquidationThreshold,
+            uint256 ltv,
+            uint256 healthFactor
+        );
 }
 
 /// @title HyperLendAdapter
@@ -36,17 +40,17 @@ contract HyperLendAdapter is BaseAdapter {
     address public immutable USDC;
 
     bool private _initialized;
-    
+
     // ============ Events ============
-    
+
     event CollateralSupplied(address indexed user, address indexed asset, uint256 amount);
     event AssetBorrowed(address indexed user, address indexed asset, uint256 amount, uint256 interestRateMode);
     event AssetWithdrawn(address indexed user, address indexed asset, uint256 amount);
     event DebtRepaid(address indexed user, address indexed asset, uint256 amount);
     event AdapterInitialized(address indexed executor);
-    
+
     // ============ Errors ============
-    
+
     error OnlyExecutor();
     error InvalidAsset();
     error SupplyFailed(string reason);
@@ -55,32 +59,27 @@ contract HyperLendAdapter is BaseAdapter {
     error RepayFailed(string reason);
     error InsufficientCollateral();
     error InvalidInterestRateMode();
-    
+
     // ============ Modifiers ============
-    
+
     modifier onlyExecutor() {
         if (msg.sender != executor) revert OnlyExecutor();
         _;
     }
-    
+
     modifier validAsset(address asset) {
         if (asset == address(0)) revert InvalidAsset();
         _;
     }
-    
+
     modifier whenInitialized() {
         require(_initialized, "Adapter not initialized");
         _;
     }
-    
+
     // ============ Constructor ============
 
-    constructor(
-        address _executor,
-        address _hyperlendPool,
-        address _behype,
-        address _usdc
-    ) validAddress(_executor) {
+    constructor(address _executor, address _hyperlendPool, address _behype, address _usdc) validAddress(_executor) {
         require(_hyperlendPool != address(0), "Invalid HyperLend pool address");
         require(_behype != address(0), "Invalid beHYPE address");
         require(_usdc != address(0), "Invalid USDC address");
@@ -93,7 +92,7 @@ contract HyperLendAdapter is BaseAdapter {
 
         emit AdapterInitialized(_executor);
     }
-    
+
     // ============ Core Functions ============
 
     /// @notice Supply asset as collateral to HyperLend
@@ -151,7 +150,7 @@ contract HyperLendAdapter is BaseAdapter {
         uint256 interestRateMode = VARIABLE_RATE;
 
         // Check user's borrowing capacity before borrowing
-        (, , uint256 availableBorrowsETH, , , uint256 healthFactor) =
+        (,, uint256 availableBorrowsETH,,, uint256 healthFactor) =
             IHyperLend(HYPERLEND_POOL).getUserAccountData(recipient);
 
         if (healthFactor > 0 && healthFactor < 1e18) {
@@ -159,13 +158,7 @@ contract HyperLendAdapter is BaseAdapter {
         }
 
         // Borrow asset from HyperLend
-        try IHyperLend(HYPERLEND_POOL).borrow(
-            asset,
-            amount,
-            interestRateMode,
-            DEFAULT_REFERRAL,
-            recipient
-        ) {
+        try IHyperLend(HYPERLEND_POOL).borrow(asset, amount, interestRateMode, DEFAULT_REFERRAL, recipient) {
             success = true;
             emit AssetBorrowed(recipient, asset, amount, interestRateMode);
 
@@ -249,9 +242,9 @@ contract HyperLendAdapter is BaseAdapter {
 
         return amountRepaid;
     }
-    
+
     // ============ View Functions ============
-    
+
     /// @notice Get user account data from HyperLend
     /// @param user User address
     /// @return totalCollateralETH Total collateral in ETH
@@ -260,17 +253,21 @@ contract HyperLendAdapter is BaseAdapter {
     /// @return currentLiquidationThreshold Current liquidation threshold
     /// @return ltv Loan to value ratio
     /// @return healthFactor Current health factor
-    function getUserAccountData(address user) external view returns (
-        uint256 totalCollateralETH,
-        uint256 totalDebtETH,
-        uint256 availableBorrowsETH,
-        uint256 currentLiquidationThreshold,
-        uint256 ltv,
-        uint256 healthFactor
-    ) {
+    function getUserAccountData(address user)
+        external
+        view
+        returns (
+            uint256 totalCollateralETH,
+            uint256 totalDebtETH,
+            uint256 availableBorrowsETH,
+            uint256 currentLiquidationThreshold,
+            uint256 ltv,
+            uint256 healthFactor
+        )
+    {
         return IHyperLend(HYPERLEND_POOL).getUserAccountData(user);
     }
-    
+
     /// @notice Check if adapter is initialized
     /// @return True if initialized
     function isInitialized() external view returns (bool) {
