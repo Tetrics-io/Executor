@@ -35,5 +35,3 @@ cd ../web3-app && npm run dev
 ```bash
 cd api && cargo test
 ```
-
-See `CLAUDE.md` for detailed architecture.
