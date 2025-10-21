@@ -15,7 +15,7 @@ contract ERC165Test is Test {
     function setUp() public {
         vm.prank(owner);
         executor = new UniExecutor(owner);
-        
+
         vm.prank(owner);
         executor.setSolver(solver);
     }
@@ -47,11 +47,11 @@ contract ERC165Test is Test {
 
     function test_SupportsInterfaceGasUsage() public {
         bytes4 erc165InterfaceId = type(IERC165).interfaceId;
-        
+
         uint256 gasBefore = gasleft();
         executor.supportsInterface(erc165InterfaceId);
         uint256 gasUsed = gasBefore - gasleft();
-        
+
         assertLt(gasUsed, 30000, "supportsInterface should use less than 30k gas");
     }
 

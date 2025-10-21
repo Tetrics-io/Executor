@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 /// @title IPermit2
@@ -11,7 +11,6 @@ interface IPermit2 {
 
     struct PermitBatchTransferFrom {
         TokenPermissions[] permitted;
-        address spender;
         uint256 nonce;
         uint256 deadline;
     }
@@ -37,7 +36,6 @@ interface IPermit2 {
 
     struct PermitTransferFrom {
         TokenPermissions permitted;
-        address spender;
         uint256 nonce;
         uint256 deadline;
     }

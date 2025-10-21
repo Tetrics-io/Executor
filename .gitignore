@@ -1,6 +1,7 @@
 # Foundry compiler files
 cache/
 out/
+tmp/
 
 # Foundry broadcast logs (deployment artifacts)
 # Allow broadcast/ directory but ignore specific network deployments
@@ -26,6 +27,8 @@ lib
 .env.staging
 .env.test
 .env.*
+
+.claude
 
 # Private keys and sensitive data
 *.pem
@@ -59,3 +62,9 @@ yarn-error.log*
 
 # Documentation build
 docs/
+
+# Rust build artifacts
+target/
+
+# Production deployment artifacts
+dist/

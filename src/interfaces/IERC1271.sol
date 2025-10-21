@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 /// @title IERC1271
@@ -16,7 +16,7 @@ interface IERC1271 {
 library ERC1271Constants {
     /// @notice Magic value to be returned upon successful validation
     bytes4 internal constant ERC1271_MAGIC_VALUE = 0x1626ba7e;
-    
-    /// @notice Value to be returned when signature validation fails  
+
+    /// @notice Value to be returned when signature validation fails
     bytes4 internal constant ERC1271_INVALID_SIGNATURE = 0xffffffff;
 }

@@ -9,16 +9,18 @@ import "../src/interfaces/IUniExecutor.sol";
 
 contract IntegrationStandardsTest is Test {
     UniExecutor public executor;
-    address public owner = address(0x1);
-    address public solver = address(0x2);
-    
+    address public owner;
+    address public solver;
+
     uint256 public ownerPrivateKey = 0x1;
     uint256 public solverPrivateKey = 0x2;
 
     function setUp() public {
-        vm.prank(owner);
+        owner = vm.addr(ownerPrivateKey);
+        solver = vm.addr(solverPrivateKey);
+
         executor = new UniExecutor(owner);
-        
+
         vm.prank(owner);
         executor.setSolver(solver);
     }
@@ -39,11 +41,13 @@ contract IntegrationStandardsTest is Test {
         bytes4 erc1271InterfaceId = type(IERC1271).interfaceId;
         assertTrue(executor.supportsInterface(erc1271InterfaceId), "Contract wallet should support ERC-1271");
 
-        bytes32 typedDataHash = keccak256(abi.encodePacked(
-            "\x19\x01",
-            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-            keccak256("test data")
-        ));
+        bytes32 typedDataHash = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256("test data")
+            )
+        );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(solverPrivateKey, typedDataHash);
         bytes memory signature = abi.encodePacked(r, s, v);
@@ -58,7 +62,7 @@ contract IntegrationStandardsTest is Test {
         supportedInterfaces[1] = type(IERC1271).interfaceId;
         supportedInterfaces[2] = type(IUniExecutor).interfaceId;
 
-        for (uint i = 0; i < supportedInterfaces.length; i++) {
+        for (uint256 i = 0; i < supportedInterfaces.length; i++) {
             assertTrue(
                 executor.supportsInterface(supportedInterfaces[i]),
                 string(abi.encodePacked("Should support interface ", vm.toString(supportedInterfaces[i])))
@@ -75,10 +79,10 @@ contract IntegrationStandardsTest is Test {
 
     function test_MultiSigCompatibilityPattern() public {
         bytes32 multiSigHash = keccak256("multisig operation");
-        
+
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(ownerPrivateKey, multiSigHash);
         bytes memory ownerSignature = abi.encodePacked(r1, s1, v1);
-        
+
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(solverPrivateKey, multiSigHash);
         bytes memory solverSignature = abi.encodePacked(r2, s2, v2);
 
@@ -92,7 +96,7 @@ contract IntegrationStandardsTest is Test {
     function test_CrossChainSignatureValidation() public {
         uint256 ethereum_chainId = 1;
         uint256 arbitrum_chainId = 42161;
-        
+
         bytes32 ethereumHash = keccak256(abi.encodePacked("ethereum", ethereum_chainId));
         bytes32 arbitrumHash = keccak256(abi.encodePacked("arbitrum", arbitrum_chainId));
 
@@ -110,13 +114,9 @@ contract IntegrationStandardsTest is Test {
     }
 
     function test_Permit2IntegrationWithERC1271() public {
-        bytes32 permit2Hash = keccak256(abi.encodePacked(
-            "PERMIT2_SINGLE",
-            owner,
-            address(0xdead),
-            uint256(1000),
-            uint256(block.timestamp + 3600)
-        ));
+        bytes32 permit2Hash = keccak256(
+            abi.encodePacked("PERMIT2_SINGLE", owner, address(0xdead), uint256(1000), uint256(block.timestamp + 3600))
+        );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(solverPrivateKey, permit2Hash);
         bytes memory signature = abi.encodePacked(r, s, v);
@@ -126,9 +126,9 @@ contract IntegrationStandardsTest is Test {
     }
 
     function test_EmergencyOperatorSignatureValidation() public {
-        address emergencyOp = address(0x999);
         uint256 emergencyPrivateKey = 0x999;
-        
+        address emergencyOp = vm.addr(emergencyPrivateKey);
+
         vm.prank(owner);
         executor.addEmergencyOperator(emergencyOp);
 
@@ -151,7 +151,7 @@ contract IntegrationStandardsTest is Test {
 
         bytes4 result = executor.isValidSignature(testHash, signature);
         assertEq(result, ERC1271Constants.ERC1271_MAGIC_VALUE, "Signature validation compliance");
-        
+
         assertFalse(executor.supportsInterface(0xffffffff), "Invalid interface rejection");
         assertFalse(executor.supportsInterface(0x00000000), "Zero interface rejection");
     }
