@@ -46,23 +46,49 @@ contract HyperLiquidMorphoAdapter {
     address public immutable MORPHO_BLUE;
     address public immutable executor;
 
-    // USDC/beHYPE market parameters for Hyperliquid
-    address public constant USDC = 0xb88339CB7199b77E23DB6E890353E22632Ba630f;
-    address public constant BEHYPE = 0xd8FC8F0b03eBA61F64D08B0bef69d80916E5DdA9;
-    // Note: These need to be filled in with actual Hyperliquid Morpho market parameters
-    address public constant ORACLE = address(0); // Placeholder - need actual oracle
-    address public constant IRM = address(0); // Placeholder - need actual IRM
-    uint256 public constant LLTV = 860000000000000000; // 86% - common default
+    // USDC/beHYPE market parameters for Hyperliquid - passed via constructor
+    address public immutable USDC;
+    address public immutable BEHYPE;
+    address public immutable ORACLE;
+    address public immutable IRM;
+    uint256 public immutable LLTV;
 
     event CollateralSupplied(address indexed user, address indexed asset, uint256 amount);
     event AssetBorrowed(address indexed user, address indexed asset, uint256 amount);
     event AssetSupplied(address indexed user, address indexed asset, uint256 amount);
 
-    constructor(address _morphoBlue, address _executor) {
+    /// @notice Initialize the adapter with Morpho protocol addresses and market parameters
+    /// @param _morphoBlue Address of the Morpho Blue protocol on Hyperliquid
+    /// @param _executor Address of the UniExecutor contract
+    /// @param _usdc Address of USDC token on Hyperliquid
+    /// @param _behype Address of beHYPE token on Hyperliquid
+    /// @param _oracle Address of the price oracle for the USDC/beHYPE market
+    /// @param _irm Address of the interest rate model for the market
+    /// @param _lltv Liquidation Loan-to-Value ratio (e.g., 860000000000000000 for 86%)
+    constructor(
+        address _morphoBlue,
+        address _executor,
+        address _usdc,
+        address _behype,
+        address _oracle,
+        address _irm,
+        uint256 _lltv
+    ) {
         require(_morphoBlue != address(0), "Invalid Morpho address");
         require(_executor != address(0), "Invalid executor");
+        require(_usdc != address(0), "Invalid USDC address");
+        require(_behype != address(0), "Invalid beHYPE address");
+        require(_oracle != address(0), "Invalid oracle address");
+        require(_irm != address(0), "Invalid IRM address");
+        require(_lltv > 0 && _lltv < 1e18, "Invalid LLTV");
+
         MORPHO_BLUE = _morphoBlue;
         executor = _executor;
+        USDC = _usdc;
+        BEHYPE = _behype;
+        ORACLE = _oracle;
+        IRM = _irm;
+        LLTV = _lltv;
     }
 
     /// @notice Supply USDC to Morpho market

@@ -291,7 +291,19 @@ contract DeployScript is Script {
             morphoAdapter = MorphoAdapter(existingMorpho);
             console.log("Using existing MorphoAdapter:", address(morphoAdapter));
         } else {
-            morphoAdapter = new MorphoAdapter(protocols.morphoBlue, protocols.morphoWstEthUsdcMarket);
+            // Load Morpho market parameters from environment
+            address morphoOracle = vm.envOr("MORPHO_ORACLE", address(0x48F7E36EB6B826B2dF4B2E630B62Cd25e89E40e2));
+            address morphoIrm = vm.envOr("MORPHO_IRM", address(0x870aC11D48B15DB9a138Cf899d20F13F79Ba00BC));
+            uint256 morphoLltv = vm.envOr("MORPHO_LLTV", uint256(860000000000000000));
+
+            morphoAdapter = new MorphoAdapter(
+                protocols.morphoBlue,
+                protocols.usdc,
+                protocols.wstethToken,
+                morphoOracle,
+                morphoIrm,
+                morphoLltv
+            );
             console.log("MorphoAdapter deployed at:", address(morphoAdapter));
         }
 

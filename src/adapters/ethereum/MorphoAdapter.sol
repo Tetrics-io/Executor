@@ -29,29 +29,41 @@ interface IMorphoBlue {
 contract MorphoAdapter {
     address public immutable MORPHO_BLUE;
 
-    // wstETH/USDC market parameters
+    // wstETH/USDC market parameters - passed via constructor
     address public immutable USDC;
     address public immutable WSTETH;
     address public immutable ORACLE;
     address public immutable IRM;
     uint256 public immutable LLTV;
 
-    /// @notice Initialize the adapter with Morpho protocol addresses
+    /// @notice Initialize the adapter with Morpho protocol addresses and market parameters
     /// @param _morphoBlue Address of the Morpho Blue protocol
-    /// @param _wstethUsdcMarket Address of the wstETH/USDC market configuration
-    constructor(address _morphoBlue, address _wstethUsdcMarket) {
+    /// @param _usdc Address of USDC token
+    /// @param _wsteth Address of wstETH token
+    /// @param _oracle Address of the price oracle for the wstETH/USDC market
+    /// @param _irm Address of the interest rate model for the market
+    /// @param _lltv Liquidation Loan-to-Value ratio (e.g., 860000000000000000 for 86%)
+    constructor(
+        address _morphoBlue,
+        address _usdc,
+        address _wsteth,
+        address _oracle,
+        address _irm,
+        uint256 _lltv
+    ) {
         require(_morphoBlue != address(0), "Invalid Morpho Blue address");
-        require(_wstethUsdcMarket != address(0), "Invalid market address");
+        require(_usdc != address(0), "Invalid USDC address");
+        require(_wsteth != address(0), "Invalid wstETH address");
+        require(_oracle != address(0), "Invalid oracle address");
+        require(_irm != address(0), "Invalid IRM address");
+        require(_lltv > 0 && _lltv < 1e18, "Invalid LLTV");
 
         MORPHO_BLUE = _morphoBlue;
-
-        // For now, we'll hardcode the market parameters
-        // In a more sophisticated implementation, these could be read from the market contract
-        USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-        WSTETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
-        ORACLE = 0x48F7E36EB6B826B2dF4B2E630B62Cd25e89E40e2;
-        IRM = 0x870aC11D48B15DB9a138Cf899d20F13F79Ba00BC;
-        LLTV = 860000000000000000; // 86%
+        USDC = _usdc;
+        WSTETH = _wsteth;
+        ORACLE = _oracle;
+        IRM = _irm;
+        LLTV = _lltv;
     }
 
     event CollateralSupplied(address indexed user, uint256 amount);
