@@ -1,6 +1,6 @@
 # Tetrics Protocol
 
-Zero-code DeFi strategy composition across Ethereum and Hyperliquid.
+Zero-code Flexible Unified margin protocol.
 
 ## Quick Start
 
@@ -35,3 +35,4 @@ cd ../web3-app && npm run dev
 ```bash
 cd api && cargo test
 ```
+ 
