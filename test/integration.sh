@@ -26,6 +26,7 @@ WSTETH_ADAPTER="0xF8982849A04d7CeD0c36ed9028e293CB4c2277C9"
 MORPHO_ADAPTER="0x1b7754689d5bDf4618aA52dDD319D809a00B0843"
 ACROSS_ADAPTER="0x312D098B64e32ef04736662249bd57AEfe053750"
 HYPERCORE_WRITER="0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
+HYPERLIQUID_CHAIN_ID=999
 
 # Token addresses
 USDC="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -70,7 +71,7 @@ echo -e "\n${GREEN}Step 5: Bridge USDC to Hyperliquid via Across${NC}"
 # Approve Across adapter
 cast send $USDC "approve(address,uint256)" $ACROSS_ADAPTER 10000000 --private-key $PRIVATE_KEY --rpc-url $ETH_RPC
 # Bridge to Hyperliquid
-cast send $ACROSS_ADAPTER "bridgeToHyperliquid(uint256,address)" 10000000 $USER_ADDRESS --private-key $PRIVATE_KEY --rpc-url $ETH_RPC
+cast send $ACROSS_ADAPTER "bridgeSimple(address,uint256,uint256,address)" $USDC 10000000 $HYPERLIQUID_CHAIN_ID $USER_ADDRESS --private-key $PRIVATE_KEY --rpc-url $ETH_RPC
 
 echo -e "\n${GREEN}Step 6: Trade on Hyperliquid via CoreWriter${NC}"
 # Place a buy order for ETH

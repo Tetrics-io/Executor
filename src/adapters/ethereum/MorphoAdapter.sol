@@ -22,6 +22,20 @@ interface IMorphoBlue {
         address onBehalf,
         address receiver
     ) external returns (uint256, uint256);
+
+    function repay(
+        MarketParams memory marketParams,
+        uint256 assets,
+        uint256 shares,
+        address onBehalf
+    ) external returns (uint256, uint256);
+
+    function withdrawCollateral(
+        MarketParams memory marketParams,
+        uint256 assets,
+        address onBehalf,
+        address receiver
+    ) external;
 }
 
 /// @title MorphoAdapter
@@ -68,6 +82,8 @@ contract MorphoAdapter {
 
     event CollateralSupplied(address indexed user, uint256 amount);
     event BorrowExecuted(address indexed user, uint256 amount);
+    event DebtRepaid(address indexed user, uint256 amount);
+    event CollateralWithdrawn(address indexed user, address indexed recipient, uint256 amount);
 
     /// @notice Supply wstETH as collateral and borrow USDC in one transaction
     /// @param wstEthAmount Amount of wstETH to supply as collateral
@@ -134,5 +150,44 @@ contract MorphoAdapter {
         if (residual > 0) {
             IERC20(WSTETH).transfer(recipient, residual);
         }
+    }
+
+    /// @notice Repay outstanding USDC debt on a supplied position
+    /// @param usdcAmount Amount of USDC to repay (cannot be zero)
+    /// @param borrower Address whose debt should be reduced
+    function repay(uint256 usdcAmount, address borrower) external {
+        require(borrower != address(0), "Invalid borrower");
+        require(usdcAmount > 0, "Invalid repay amount");
+
+        // Pull funds from caller if adapter balance is insufficient
+        uint256 adapterBalance = IERC20(USDC).balanceOf(address(this));
+        if (adapterBalance < usdcAmount) {
+            uint256 shortfall = usdcAmount - adapterBalance;
+            IERC20(USDC).transferFrom(msg.sender, address(this), shortfall);
+        }
+
+        IERC20(USDC).approve(MORPHO_BLUE, usdcAmount);
+        IMorphoBlue(MORPHO_BLUE).repay(_marketParams(), usdcAmount, 0, borrower);
+
+        emit DebtRepaid(borrower, usdcAmount);
+    }
+
+    /// @notice Withdraw supplied wstETH collateral back to the user
+    /// @param collateralAmount Amount of wstETH collateral to withdraw
+    /// @param positionOwner Address that owns the debt position
+    /// @param recipient Address that should receive the collateral (defaults to positionOwner when zero)
+    function withdrawCollateral(uint256 collateralAmount, address positionOwner, address recipient) external {
+        require(collateralAmount > 0, "Invalid collateral amount");
+        require(positionOwner != address(0), "Invalid owner");
+
+        address targetRecipient = recipient == address(0) ? positionOwner : recipient;
+
+        IMorphoBlue(MORPHO_BLUE).withdrawCollateral(_marketParams(), collateralAmount, positionOwner, targetRecipient);
+        emit CollateralWithdrawn(positionOwner, targetRecipient, collateralAmount);
+    }
+
+    function _marketParams() internal view returns (IMorphoBlue.MarketParams memory params) {
+        params =
+            IMorphoBlue.MarketParams({loanToken: USDC, collateralToken: WSTETH, oracle: ORACLE, irm: IRM, lltv: LLTV});
     }
 }

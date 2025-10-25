@@ -27,6 +27,24 @@ contract DeployScript is Script {
         address[] multiSigOwners;
         uint256 requiredConfirmations;
         address emergencyOperator;
+        uint256 hyperliquidChainId;
+        uint256 arbitrumChainId;
+    }
+
+    function _configureAcrossAdapterDefaults() internal {
+        if (address(acrossAdapter) == address(0)) return;
+
+        if (protocols.usdc != address(0)) {
+            acrossAdapter.configureToken(protocols.usdc, protocols.usdc, true);
+        }
+
+        if (config.hyperliquidChainId != 0 && config.chainId != config.hyperliquidChainId) {
+            acrossAdapter.configureDestination(config.hyperliquidChainId, true);
+        }
+
+        if (config.arbitrumChainId != 0 && config.chainId != config.arbitrumChainId) {
+            acrossAdapter.configureDestination(config.arbitrumChainId, true);
+        }
     }
 
     struct ProtocolAddresses {
@@ -111,7 +129,9 @@ contract DeployScript is Script {
         _deployExecutor(deployer);
 
         // Phase 4: Deploy protocol adapters based on network
-        if (config.chainId == 31337 || config.chainId == 1 || config.chainId == 11155111) {
+        if (
+            config.chainId == 31337 || config.chainId == 1 || config.chainId == 11155111 || config.chainId == 42161
+        ) {
             // Ethereum or Ethereum fork
             _deployEthereumAdapters();
         }
@@ -146,6 +166,8 @@ contract DeployScript is Script {
         config.useRealOracle = vm.envBool("USE_REAL_ORACLE");
         config.requiredConfirmations = vm.envUint("MULTISIG_REQUIRED_CONFIRMATIONS");
         config.emergencyOperator = vm.envAddress("EMERGENCY_OPERATOR");
+        config.hyperliquidChainId = vm.envOr("HYPERLIQUID_CHAIN_ID", uint256(999));
+        config.arbitrumChainId = vm.envOr("ARBITRUM_CHAIN_ID", uint256(42161));
 
         // Load multisig owners
         address[] memory owners = new address[](5);
@@ -265,56 +287,78 @@ contract DeployScript is Script {
     function _deployEthereumAdapters() internal {
         console.log("\\nDeploying Ethereum Adapters...");
 
-        // Deploy Lido Adapter
-        address existingLido = vm.envOr("LIDO_ADAPTER_ADDRESS", address(0));
-        if (existingLido != address(0)) {
-            lidoAdapter = LidoAdapter(existingLido);
-            console.log("Using existing LidoAdapter:", address(lidoAdapter));
+        // Deploy Lido Adapter (only when addresses are configured)
+        if (protocols.lidoStETH != address(0)) {
+            address existingLido = vm.envOr("LIDO_ADAPTER_ADDRESS", address(0));
+            if (existingLido != address(0)) {
+                lidoAdapter = LidoAdapter(existingLido);
+                console.log("Using existing LidoAdapter:", address(lidoAdapter));
+            } else {
+                lidoAdapter = new LidoAdapter(protocols.lidoStETH);
+                console.log("LidoAdapter deployed at:", address(lidoAdapter));
+            }
         } else {
-            lidoAdapter = new LidoAdapter(protocols.lidoStETH);
-            console.log("LidoAdapter deployed at:", address(lidoAdapter));
+            console.log("Skipping LidoAdapter deployment (LIDO_STETH not configured)");
         }
 
         // Deploy WstETH Adapter
-        address existingWstETH = vm.envOr("WSTETH_ADAPTER_ADDRESS", address(0));
-        if (existingWstETH != address(0)) {
-            wstethAdapter = WstETHAdapter(existingWstETH);
-            console.log("Using existing WstETHAdapter:", address(wstethAdapter));
+        if (protocols.lidoStETH != address(0) && protocols.wstethToken != address(0)) {
+            address existingWstETH = vm.envOr("WSTETH_ADAPTER_ADDRESS", address(0));
+            if (existingWstETH != address(0)) {
+                wstethAdapter = WstETHAdapter(existingWstETH);
+                console.log("Using existing WstETHAdapter:", address(wstethAdapter));
+            } else {
+                wstethAdapter = new WstETHAdapter(protocols.lidoStETH, protocols.wstethToken);
+                console.log("WstETHAdapter deployed at:", address(wstethAdapter));
+            }
         } else {
-            wstethAdapter = new WstETHAdapter(protocols.lidoStETH, protocols.wstethToken);
-            console.log("WstETHAdapter deployed at:", address(wstethAdapter));
+            console.log("Skipping WstETHAdapter deployment (wstETH assets not configured)");
         }
 
         // Deploy Morpho Adapter
-        address existingMorpho = vm.envOr("MORPHO_ADAPTER_ADDRESS", address(0));
-        if (existingMorpho != address(0)) {
-            morphoAdapter = MorphoAdapter(existingMorpho);
-            console.log("Using existing MorphoAdapter:", address(morphoAdapter));
-        } else {
-            // Load Morpho market parameters from environment
-            address morphoOracle = vm.envOr("MORPHO_ORACLE", address(0x48F7E36EB6B826B2dF4B2E630B62Cd25e89E40e2));
-            address morphoIrm = vm.envOr("MORPHO_IRM", address(0x870aC11D48B15DB9a138Cf899d20F13F79Ba00BC));
-            uint256 morphoLltv = vm.envOr("MORPHO_LLTV", uint256(860000000000000000));
+        if (protocols.morphoBlue != address(0) && protocols.usdc != address(0) && protocols.wstethToken != address(0)) {
+            address existingMorpho = vm.envOr("MORPHO_ADAPTER_ADDRESS", address(0));
+            if (existingMorpho != address(0)) {
+                morphoAdapter = MorphoAdapter(existingMorpho);
+                console.log("Using existing MorphoAdapter:", address(morphoAdapter));
+            } else {
+                // Load Morpho market parameters from environment
+                address morphoOracle = vm.envOr("MORPHO_ORACLE", address(0x48F7E36EB6B826B2dF4B2E630B62Cd25e89E40e2));
+                address morphoIrm = vm.envOr("MORPHO_IRM", address(0x870aC11D48B15DB9a138Cf899d20F13F79Ba00BC));
+                uint256 morphoLltv = vm.envOr("MORPHO_LLTV", uint256(860000000000000000));
 
-            morphoAdapter = new MorphoAdapter(
-                protocols.morphoBlue,
-                protocols.usdc,
-                protocols.wstethToken,
-                morphoOracle,
-                morphoIrm,
-                morphoLltv
-            );
-            console.log("MorphoAdapter deployed at:", address(morphoAdapter));
+                morphoAdapter = new MorphoAdapter(
+                    protocols.morphoBlue,
+                    protocols.usdc,
+                    protocols.wstethToken,
+                    morphoOracle,
+                    morphoIrm,
+                    morphoLltv
+                );
+                console.log("MorphoAdapter deployed at:", address(morphoAdapter));
+            }
+        } else {
+            console.log("Skipping MorphoAdapter deployment (market config missing)");
         }
 
         // Deploy Across Adapter
-        address existingAcross = vm.envOr("ACROSS_ADAPTER_ADDRESS", address(0));
-        if (existingAcross != address(0)) {
-            acrossAdapter = AcrossAdapter(existingAcross);
-            console.log("Using existing AcrossAdapter:", address(acrossAdapter));
+        if (protocols.acrossSpokePool != address(0)) {
+            bool configureAcrossDefaults = false;
+            address existingAcross = vm.envOr("ACROSS_ADAPTER_ADDRESS", address(0));
+            if (existingAcross != address(0)) {
+                acrossAdapter = AcrossAdapter(existingAcross);
+                console.log("Using existing AcrossAdapter:", address(acrossAdapter));
+            } else {
+                acrossAdapter = new AcrossAdapter(deployerAddress, protocols.acrossSpokePool);
+                configureAcrossDefaults = true;
+                console.log("AcrossAdapter deployed at:", address(acrossAdapter));
+            }
+
+            if (configureAcrossDefaults) {
+                _configureAcrossAdapterDefaults();
+            }
         } else {
-            acrossAdapter = new AcrossAdapter(protocols.acrossSpokePool);
-            console.log("AcrossAdapter deployed at:", address(acrossAdapter));
+            console.log("Skipping AcrossAdapter deployment (ACROSS_SPOKE_POOL not configured)");
         }
     }
 

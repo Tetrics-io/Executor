@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
-import "../../interfaces/IERC20.sol";
+import "../BaseAdapter.sol";
 
 interface IAcrossSpokePool {
     function depositV3(
@@ -16,72 +16,172 @@ interface IAcrossSpokePool {
         uint32 quoteTimestamp,
         uint32 fillDeadline,
         uint32 exclusivityDeadline,
-        bytes calldata message
+        bytes memory message
     ) external;
 }
 
 /// @title AcrossAdapter
-/// @notice Adapter for bridging tokens via Across Protocol
-contract AcrossAdapter {
-    address public immutable ACROSS_SPOKE_POOL;
-    address public immutable USDC;
+/// @notice Configurable adapter for bridging arbitrary tokens via Across Protocol
+/// @dev Uses a light admin role to keep routing flexible while leaving execution permissionless
+contract AcrossAdapter is BaseAdapter {
+    // ============ Constants ============
 
-    /// @notice Initialize the adapter with Across protocol addresses
-    /// @param _spokePool Address of the Across SpokePool contract
-    constructor(address _spokePool) {
-        require(_spokePool != address(0), "Invalid SpokePool address");
-        ACROSS_SPOKE_POOL = _spokePool;
-        // USDC is typically consistent across networks, but could be made configurable
-        USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    uint32 public constant DEFAULT_DEADLINE_DELTA = 1 hours;
+
+    // ============ Structs ============
+
+    struct TokenConfig {
+        bool allowed;
+        address outputToken;
     }
 
-    event BridgeInitiated(address indexed user, address token, uint256 amount, uint256 destinationChainId);
+    // ============ State Variables ============
 
-    /// @notice Bridge USDC to another chain via Across
-    /// @param amount Amount of USDC to bridge
-    /// @param destinationChainId Target chain ID (e.g., 42161 for Arbitrum, 999 for Hyperliquid)
-    /// @param recipient Recipient address on destination chain
-    function bridgeUSDC(uint256 amount, uint256 destinationChainId, address recipient) external {
-        _bridgeUSDC(amount, destinationChainId, recipient);
+    address public admin;
+    address public spokePool;
+    mapping(address => TokenConfig) public tokenConfigs;
+    mapping(uint256 => bool) public allowedDestinationChains;
+
+    // ============ Events ============
+
+    event BridgeInitiated(
+        address indexed user,
+        address indexed token,
+        uint256 amount,
+        uint256 indexed destinationChainId,
+        address recipient,
+        address outputToken
+    );
+    event TokenConfigured(address indexed token, address indexed outputToken, bool allowed);
+    event DestinationConfigured(uint256 indexed chainId, bool allowed);
+    event SpokePoolUpdated(address indexed newSpokePool);
+    event AdminTransferred(address indexed newAdmin);
+
+    // ============ Errors ============
+
+    error OnlyAdmin();
+    error TokenNotSupported(address token);
+    error DestinationNotAllowed(uint256 chainId);
+    error SpokePoolNotSet();
+
+    // ============ Modifiers ============
+
+    modifier onlyAdmin() {
+        if (msg.sender != admin) revert OnlyAdmin();
+        _;
     }
 
-    /// @notice Bridge to Arbitrum (chain ID 42161)
-    function bridgeToArbitrum(uint256 amount, address recipient) external {
-        _bridgeUSDC(amount, 42161, recipient);
+    // ============ Constructor ============
+
+    /// @notice Initialize adapter with admin and spoke pool
+    /// @param _admin Address allowed to configure tokens/destinations
+    /// @param _spokePool Address of the Across spoke pool for the current chain
+    constructor(address _admin, address _spokePool) {
+        require(_admin != address(0), "Invalid admin");
+        admin = _admin;
+        spokePool = _spokePool;
     }
 
-    /// @notice Bridge to Hyperliquid (chain ID 999)
-    function bridgeToHyperliquid(uint256 amount, address recipient) external {
-        _bridgeUSDC(amount, 999, recipient);
+    // ============ Admin Functions ============
+
+    function transferAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "Invalid admin");
+        admin = newAdmin;
+        emit AdminTransferred(newAdmin);
     }
 
-    function _bridgeUSDC(uint256 amount, uint256 destinationChainId, address recipient) internal {
-        require(amount > 0, "Invalid amount");
-        require(recipient != address(0), "Invalid recipient");
+    function setSpokePool(address newSpokePool) external onlyAdmin {
+        require(newSpokePool != address(0), "Invalid spoke pool");
+        spokePool = newSpokePool;
+        emit SpokePoolUpdated(newSpokePool);
+    }
 
-        // Transfer USDC from user to this contract
-        require(IERC20(USDC).balanceOf(msg.sender) >= amount, "Insufficient USDC");
-        IERC20(USDC).transferFrom(msg.sender, address(this), amount);
+    function configureToken(address token, address outputToken, bool allowed) external onlyAdmin {
+        require(token != address(0), "Invalid token");
+        tokenConfigs[token] = TokenConfig({allowed: allowed, outputToken: outputToken});
+        emit TokenConfigured(token, outputToken, allowed);
+    }
 
-        // Approve Across to spend USDC
-        IERC20(USDC).approve(ACROSS_SPOKE_POOL, amount);
+    function configureDestination(uint256 chainId, bool allowed) external onlyAdmin {
+        allowedDestinationChains[chainId] = allowed;
+        emit DestinationConfigured(chainId, allowed);
+    }
 
-        // Execute bridge
-        IAcrossSpokePool(ACROSS_SPOKE_POOL).depositV3(
-            msg.sender, // depositor
-            recipient, // recipient on destination
-            USDC, // input token
-            USDC, // output token (same for USDC)
-            amount, // input amount
-            amount, // output amount (no slippage for stables)
+    // ============ Core Functions ============
+
+    /// @notice Bridge tokens using Across with fully custom parameters
+    /// @param token Input token address
+    /// @param amount Amount of tokens to bridge (pulls from user/executor if necessary)
+    /// @param destinationChainId Target chain ID
+    /// @param recipient Recipient address on destination (defaults to msg.sender when zero)
+    /// @param outputToken Output token on destination (defaults to configured output)
+    /// @param minOutputAmount Minimum amount expected on destination (defaults to amount)
+    /// @param exclusiveRelayer Optional exclusive relayer address
+    /// @param quoteTimestamp Quote timestamp (defaults to block.timestamp when zero)
+    /// @param fillDeadline Deadline for relayer fill (defaults to quoteTimestamp + 1h when zero)
+    /// @param exclusivityDeadline Optional exclusivity deadline
+    /// @param message Additional message payload for Across (can be empty)
+    function bridge(
+        address token,
+        uint256 amount,
+        uint256 destinationChainId,
+        address recipient,
+        address outputToken,
+        uint256 minOutputAmount,
+        address exclusiveRelayer,
+        uint32 quoteTimestamp,
+        uint32 fillDeadline,
+        uint32 exclusivityDeadline,
+        bytes memory message
+    ) public returns (uint256 bridgedAmount) {
+        if (spokePool == address(0)) revert SpokePoolNotSet();
+        if (!allowedDestinationChains[destinationChainId]) {
+            revert DestinationNotAllowed(destinationChainId);
+        }
+
+        TokenConfig memory config = tokenConfigs[token];
+        if (!config.allowed) revert TokenNotSupported(token);
+
+        address destinationRecipient = _getTargetRecipient(recipient);
+        address resolvedOutputToken = outputToken != address(0) ? outputToken : (config.outputToken != address(0))
+            ? config.outputToken
+            : token;
+
+        address user = _getUser();
+        bridgedAmount = _ensureBalance(token, amount, user);
+        require(bridgedAmount > 0, "Nothing to bridge");
+
+        uint32 resolvedQuoteTimestamp = quoteTimestamp == 0 ? uint32(block.timestamp) : quoteTimestamp;
+        uint32 resolvedFillDeadline =
+            fillDeadline == 0 ? resolvedQuoteTimestamp + DEFAULT_DEADLINE_DELTA : fillDeadline;
+        uint256 outputAmount = minOutputAmount == 0 ? bridgedAmount : minOutputAmount;
+
+        _safeApprove(token, spokePool, bridgedAmount);
+
+        IAcrossSpokePool(spokePool).depositV3(
+            user,
+            destinationRecipient,
+            token,
+            resolvedOutputToken,
+            bridgedAmount,
+            outputAmount,
             destinationChainId,
-            address(0), // no exclusive relayer
-            uint32(block.timestamp), // quote timestamp
-            uint32(block.timestamp + 3600), // fill deadline (1 hour)
-            0, // no exclusivity
-            "" // no message
+            exclusiveRelayer,
+            resolvedQuoteTimestamp,
+            resolvedFillDeadline,
+            exclusivityDeadline,
+            message
         );
 
-        emit BridgeInitiated(msg.sender, USDC, amount, destinationChainId);
+        emit BridgeInitiated(user, token, bridgedAmount, destinationChainId, destinationRecipient, resolvedOutputToken);
+        return bridgedAmount;
+    }
+
+    /// @notice Convenience helper that uses configured defaults for most parameters
+    function bridgeSimple(address token, uint256 amount, uint256 destinationChainId, address recipient)
+        external
+        returns (uint256)
+    {
+        return bridge(token, amount, destinationChainId, recipient, address(0), 0, address(0), 0, 0, 0, bytes(""));
     }
 }
